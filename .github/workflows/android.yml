@@ -1,8 +1,5 @@
-# .github/workflows/android_build.yml
-
 name: Android CI Build
 
-# This workflow runs on every push to the 'main' branch
 on:
   push:
     branches: [ "main" ]

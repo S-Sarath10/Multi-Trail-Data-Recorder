@@ -1,52 +1,59 @@
-name: Android CI Build
+name: Android Release
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    tags:
+      - 'v*' # Triggers only when pushing a tag like v1.0, v2.3.4
+
+permissions:
+  contents: write # Needed to create releases
 
 jobs:
   build:
+    name: Build and Release APK
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checks out your repository's code so the job can access it
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    # 2. Sets up the Java Development Kit (JDK) environment
-    #    Make sure the Java version matches what your project needs
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
 
-    # 3. (Optional but Recommended) Cache Gradle dependencies to speed up future builds
-    - name: Cache Gradle packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
-    # 4. Grants execute permission to the gradlew script
-    #    This is a necessary step for Unix-based environments like the GitHub runner
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+      - name: Build Release APK
+        # Builds the unsigned release APK
+        run: ./gradlew assembleRelease
 
-    # 5. Executes the build command to generate the release APK
-    - name: Build with Gradle
-      run: ./gradlew :app:assembleRelease
+      - name: Sign Release APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_app
+        with:
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+        env:
+          # Override build tools version if necessary, usually not needed
+          BUILD_TOOLS_VERSION: "34.0.0"
 
-    # 6. Uploads the generated APK as a build artifact
-    #    This is what makes the file downloadable from the workflow's summary page
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-release.apk
-        path: app/build/outputs/apk/release/app-release.apk
+      - name: Rename Signed APK
+        run: mv ${{ steps.sign_app.outputs.signedReleaseFile }} app-release-${{ github.ref_name }}.apk
+
+      - name: Create Release and Upload APK
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true # Auto-generates change log from commits
+          files: app-release-${{ github.ref_name }}.apk

@@ -1,6 +1,7 @@
 package sar.id.mlt.dr;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -12,7 +13,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.View;
-import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
@@ -54,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
 					initializeApp();
 				} else {
 					Toast.makeText(this, "Camera permission required for full functionality.", Toast.LENGTH_LONG).show();
-					initializeApp(); // still load but with reduced features
+					initializeApp();
 				}
 			});
 	private long backPressedTime = 0L;
@@ -74,7 +74,8 @@ public class MainActivity extends AppCompatActivity {
 		}
 	}
 
-	private void initializeApp() {
+	@SuppressLint("SetJavaScriptEnabled")
+    private void initializeApp() {
 		binding.webView.setVisibility(View.VISIBLE);
 		WebSettings webSettings = binding.webView.getSettings();
 		webSettings.setJavaScriptEnabled(true);
@@ -82,14 +83,13 @@ public class MainActivity extends AppCompatActivity {
 		webSettings.setDatabaseEnabled(true);
 		webSettings.setAllowFileAccess(true);
 		webSettings.setAllowContentAccess(true);
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-			try {
-				webSettings.setAllowFileAccessFromFileURLs(false);
-				webSettings.setAllowUniversalAccessFromFileURLs(false);
-			} catch (Exception ignored) { }
-		}
+        try {
+            webSettings.setAllowFileAccessFromFileURLs(false);
+            webSettings.setAllowUniversalAccessFromFileURLs(false);
+        } catch (Exception ignored) {
+        }
 
-		webSettings.setJavaScriptCanOpenWindowsAutomatically(false);
+        webSettings.setJavaScriptCanOpenWindowsAutomatically(false);
 		webSettings.setMediaPlaybackRequiresUserGesture(false);
 		webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -221,21 +221,19 @@ public class MainActivity extends AppCompatActivity {
 			try {
 				getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
 						android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-						() -> {
-							runOnUiThread(() -> {
-								if (binding.webView.canGoBack()) {
-									binding.webView.goBack();
-								} else {
-									long now = System.currentTimeMillis();
-									if (backPressedTime + 2000 > now) {
-										finish();
-									} else {
-										backPressedTime = now;
-										Toast.makeText(MainActivity.this, "Press again to exit", Toast.LENGTH_SHORT).show();
-									}
-								}
-							});
-						});
+						() -> runOnUiThread(() -> {
+                            if (binding.webView.canGoBack()) {
+                                binding.webView.goBack();
+                            } else {
+                                long now = System.currentTimeMillis();
+                                if (backPressedTime + 2000 > now) {
+                                    finish();
+                                } else {
+                                    backPressedTime = now;
+                                    Toast.makeText(MainActivity.this, "Press again to exit", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        }));
 			} catch (Exception ignored) { }
 		}
 	}

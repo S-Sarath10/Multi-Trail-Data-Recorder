@@ -28,9 +28,13 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Debug Project Structure
+        # Lists all modules to ensure ':app' exists
+        run: ./gradlew projects
+
       - name: Build Release APK
-        # Builds the unsigned release APK
-        run: ./gradlew assembleRelease
+        # Targeted build for the ':app' module specifically
+        run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Sign Release APK
         uses: r0adkll/sign-android-release@v1

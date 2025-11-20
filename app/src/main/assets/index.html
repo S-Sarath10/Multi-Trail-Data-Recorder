@@ -214,6 +214,7 @@
         max-height: 60vh;
         border-radius: var(--border-radius);
         border: 1px solid var(--border-color);
+        overscroll-behavior-x: contain; /* This prevents horizontal scroll from triggering vertical page scroll */
       }
       .table {
         width: 100%;
@@ -261,6 +262,48 @@
       .table tbody tr:last-child th,
       .table tbody tr:last-child td {
         border-bottom: 0;
+      }
+      
+      /* --- Responsive Table/Card View for Mobile --- */
+      @media (max-width: 768px) {
+        .table thead {
+          /* Hide the table header on mobile */
+          display: none;
+        }
+        .table, .table tbody, .table tr, .table td {
+          /* Make table elements behave like blocks */
+          display: block;
+          width: 100%;
+        }
+        .table tr {
+          /* Style each row as a card */
+          margin-bottom: 1rem;
+          border: 1px solid var(--border-color);
+          border-radius: var(--border-radius);
+          box-shadow: var(--box-shadow);
+          padding: 1rem;
+        }
+        .table td {
+          /* Arrange cell content */
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          text-align: right;
+          padding: 0.5rem 0;
+          border-bottom: 1px dashed var(--base-300);
+          border-right: none; /* This removes the unwanted vertical line */
+        }
+        .table tr td:last-child {
+          border-bottom: none;
+        }
+        .table td::before {
+          /* Add the data label before the cell content */
+          content: attr(data-label);
+          font-weight: 600;
+          text-align: left;
+          margin-right: 1rem;
+          color: var(--primary-color);
+        }
       }
 
       /* --- Header --- */
@@ -505,6 +548,7 @@
             </div>
             <div class="button-group">
               <button id="go-to-summary-btn" class="btn btn-primary">Review & Submit</button>
+              <button id="change-traits-btn" class="btn btn-secondary">Change Traits</button>
               <button id="change-trial-btn" class="btn btn-ghost">Change Trial</button>
             </div>
           </div>
@@ -546,6 +590,16 @@
             <button id="export-csv-btn" class="btn btn-primary">Export Selected (CSV)</button>
             <button id="export-json-btn" class="btn btn-secondary">Export Selected (JSON)</button>
           </div>
+          
+          <div id="review-controls" style="margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+            <div class="form-control" style="margin-bottom: 0;">
+                <input type="search" id="genotype-filter-input" class="input" placeholder="🔍 Search for a Genotype...">
+            </div>
+            <div style="text-align: right;">
+                <button id="view-toggle-btn" class="btn btn-ghost btn-xs">Switch to Table View</button>
+            </div>
+          </div>
+          
           <div id="review-section" style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
             <h3 class="text-error" style="margin-bottom: 1rem;">Items Flagged for Review (Click to Edit)</h3>
             <div id="review-table-container" class="table-container"></div>
@@ -573,8 +627,8 @@
         </button>
     </div>
 
-    <audio id="next-sound" src="https://actions.google.com/sounds/v1/pagination/next_page.ogg" crossorigin="anonymous"></audio>
-    <audio id="prev-sound" src="https://actions.google.com/sounds/v1/pagination/previous_page.ogg" crossorigin="anonymous"></audio>
+    <audio id="next-sound" src="next_page.ogg"></audio>
+    <audio id="prev-sound" src="previous_page.ogg"></audio>
     
     <div id="camera-modal" class="modal-overlay hidden">
         <div class="modal-box max-w-2xl" style="align-items: center;">
@@ -630,8 +684,11 @@
             <div class="modal-content-body" style="padding-right: 0.5rem; display: flex; flex-direction: column; gap: 1rem;">
                 <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
                      <div class="form-control">
-                        <label for="trial-id-input" class="label">Trial ID*</label>
-                        <input type="text" id="trial-id-input" class="input">
+                        <label for="trial-id-input" class="label" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Trial ID*</span>
+                            <span id="trial-id-warning" class="hidden" style="font-size: 0.7rem; color: var(--error-color); font-weight: 400;"></span>
+                        </label>
+                        <input type="text" id="trial-id-input" placeholder="e.g. trial_001 or research ID or crop name" class="input">
                     </div>
                     <div class="form-control">
                         <label for="trial-year-input" class="label">Year*</label>
@@ -639,12 +696,12 @@
                     </div>
                     <div class="form-control">
                         <label for="trial-season-input" class="label">Season*</label>
-                        <input type="text" id="trial-season-input" placeholder="e.g. SUMMER" class="input">
+                        <input type="text" id="trial-season-input" placeholder="e.g. Summer or Rainy or Winter" class="input">
                     </div>
                 </div>
                  <div class="form-control">
                     <label for="trial-name-input" class="label">Trial Name*</label>
-                    <input type="text" id="trial-name-input" class="input">
+                    <input type="text" id="trial-name-input" placeholder="e.g. LxT or Yield trail" class="input">
                 </div>
                 <div class="form-control">
                     <label for="trial-genotypes-input" class="label">Genotypes (comma-separated)*</label>
@@ -676,6 +733,8 @@
           let characterLimit = 6;
           let isSoundEnabled = true;
           let cameraStream = null;
+          let isChangingTraits = false;
+          let isCardView = true;
 
           // --- WEB AUDIO API SETUP ---
           let audioContext;
@@ -683,6 +742,7 @@
 
           const dom = {
             trialIdInput: document.getElementById("trial-id-input"),
+            trialIdWarning: document.getElementById("trial-id-warning"),
             trialYearInput: document.getElementById("trial-year-input"),
             trialSeasonInput: document.getElementById("trial-season-input"),
             app: document.getElementById("app"),
@@ -727,6 +787,7 @@
             backToTrialsFromCharSelectBtn: document.getElementById("back-to-trials-from-char-select-btn"),
             changeTrialBtn: document.getElementById("change-trial-btn"),
             goToSummaryBtn: document.getElementById("go-to-summary-btn"),
+            changeTraitsBtn: document.getElementById("change-traits-btn"),
             backToTrialsBtn: document.getElementById("back-to-trials-btn"),
             actionsContainer: document.getElementById("actions-container"),
             entryForm: document.getElementById("entry-form"),
@@ -742,6 +803,8 @@
             reviewTableContainer: document.getElementById("review-table-container"),
             resultsTableContainer: document.getElementById("results-table-container"),
             backToEditBtn: document.getElementById("back-to-edit-btn"),
+            genotypeFilterInput: document.getElementById("genotype-filter-input"),
+            viewToggleBtn: document.getElementById("view-toggle-btn"), 
             alertModal: document.getElementById("alert-modal"),
             modalTitle: document.getElementById("modal-title"),
             modalContent: document.getElementById("modal-content"),
@@ -784,7 +847,8 @@
           function saveSettings() {
               const settings = {
                   charLimit: characterLimit,
-                  sound: isSoundEnabled
+                  sound: isSoundEnabled,
+                  view: isCardView
               };
               localStorage.setItem('plantRecorderSettings', JSON.stringify(settings));
           }
@@ -793,6 +857,7 @@
               const settings = JSON.parse(localStorage.getItem('plantRecorderSettings')) || {};
               characterLimit = settings.charLimit || 6;
               isSoundEnabled = settings.sound !== false;
+              isCardView = settings.view !== false;
 
               dom.charLimitInput.value = characterLimit;
               dom.charLimitDisplay.textContent = characterLimit;
@@ -824,6 +889,9 @@
               }
                if (screen === 'entry') {
                   dom.fixedNavContainer.classList.remove('hidden');
+              }
+                if (screen === 'character') {
+                  dom.startRecordingBtn.textContent = isChangingTraits ? 'Continue Recording' : 'Start Recording';
               }
 
               const trialName = currentTrial ? getTrialFullName(currentTrial) : 'No Trial Selected';
@@ -954,6 +1022,7 @@
            
            function saveState() {
               if (currentTrial) {
+                  state.selectedCharacters = selectedCharacters.map(c => c.name);
                   localStorage.setItem(getStorageKey(currentTrial.internalId), JSON.stringify(state));
                   localStorage.setItem("lastActiveTrial", currentTrial.internalId);
               }
@@ -972,6 +1041,7 @@
            function loadTrial(internalId) {
               currentTrial = trials.find(t => t.internalId === internalId);
               if (currentTrial) {
+                  selectedCharacters = [];
                   dom.charSelectTrialName.textContent = getTrialFullName(currentTrial);
                   renderCharacterSelection();
                   updateView('character');
@@ -984,7 +1054,9 @@
           function startDataEntry() {
               const savedState = localStorage.getItem(getStorageKey(currentTrial.internalId));
               state = savedState ? JSON.parse(savedState) : setDefaultState(currentTrial);
-              
+            
+              state.currentIndex = 0; // Start from the beginning if not resuming
+                          
               const trialChars = currentTrial.characters.map(c => c.name);
               Object.keys(state.data).forEach(genoName => {
                   trialChars.forEach(charName => {
@@ -1094,16 +1166,27 @@
           
           function renderCharacterSelection() {
               const trial = currentTrial;
-              dom.characterSelectionContainer.innerHTML = '';
+              dom.characterSelectionContainer.innerHTML = "";
+    
               trial.characters.forEach(char => {
-                  const mergedIndicator = char.isMerged ? `<span class="merged-indicator" title="Merged">M</span>` : '';
+                  const isChecked = selectedCharacters.some(sc => sc.name === char.name);
+                  const mergedIndicator = char.isMerged ? '<span class="merged-indicator" title="Merged">M</span>' : '';
+
                   const checkboxDiv = document.createElement('div');
-                  checkboxDiv.innerHTML = `<label><input type="checkbox" data-char-name="${char.name}" class="checkbox"><span class="font-bold">${char.name}${mergedIndicator} <span style="font-size: 0.75rem; opacity: 0.7;">(${char.type})</span></span></label>`;
+                  checkboxDiv.innerHTML = `
+                      <label>
+                          <input type="checkbox" data-char-name="${char.name}" class="checkbox" ${isChecked ? 'checked' : ''}>
+                          <span class="font-bold">${char.name}${mergedIndicator}</span>
+                          <span style="font-size: 0.75rem; opacity: 0.7;">${char.type}</span>
+                      </label>
+                  `;
                   dom.characterSelectionContainer.appendChild(checkboxDiv);
               });
-              selectedCharacters = [];
-              dom.startRecordingBtn.disabled = true;
+
+              // Remove this line: selectedCharacters = [];
+              dom.startRecordingBtn.disabled = selectedCharacters.length === 0;
           }
+
 
           function renderCurrentForm() {
               if (!currentTrial || !currentTrial.genotypes || currentTrial.genotypes.length === 0) {
@@ -1208,8 +1291,10 @@
               if (selectedCharacters.length === 0) {
                   const message = '<p class="text-center" style="padding: 1rem;">No characters were selected for this session. Go back to the data entry screen to see data.</p>';
                   dom.reviewSection.classList.add("hidden");
-                  dom.reviewTableContainer.innerHTML = '';
-                  dom.resultsTableContainer.innerHTML = message;
+                  // dom.reviewTableContainer.innerHTML = '';
+                  // dom.resultsTableContainer.innerHTML = message;
+                  dom.resultsTableContainer.innerHTML = createTableHTML(headers, currentTrial.genotypes);
+                  applyReviewView();
                   updateView("export");
                   return;
               }
@@ -1227,7 +1312,7 @@
               dom.resultsTableContainer.innerHTML = createTableHTML(headers, currentTrial.genotypes);
               updateView("export");
           }
-
+/*
           function createTableHTML(headers, genotypeObjList) {
               const headerHTML = `<thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>`;
               const bodyHTML = `<tbody>${genotypeObjList.map((genoObj) => {
@@ -1262,7 +1347,73 @@
               }).join("")}</tbody>`;
               return `<table class="table">${headerHTML}${bodyHTML}</table>`;
           }
+*/
+          function createTableHTML(headers, genotypeObjList) {
+              const headerHTML = `<thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>`;
+              const bodyHTML = `<tbody>${genotypeObjList.map((genoObj) => {
+                  const genoName = genoObj.name;
+                  const d = state.data[genoName];
+                  if (!d) return '';
+                  const genoIndex = currentTrial.genotypes.findIndex(g => g.name === genoName);
+                  
+                  // *** MODIFICATION IS HERE ***
+                  const rowData = headers.map(header => {
+                      let cellContent = '';
+                      switch(header) {
+                          case 'Genotype':
+                              cellContent = genoName + (genoObj.isMerged ? ' <span class="merged-indicator" title="Merged">M</span>' : '');
+                              break;
+                          case 'Favorite':
+                              cellContent = d.isFavorite ? "✔️" : "";
+                              break;
+                          case 'Review':
+                              cellContent = d.needsReview ? "❗" : "";
+                              break;
+                          case 'Remarks':
+                              cellContent = d.remarks || "";
+                              break;
+                          default:
+                              cellContent = d[header] !== undefined ? (d[header] || "-") : "-";
+                              break;
+                      }
+                      // This adds the data-label attribute to each cell
+                      return `<td data-label="${header}">${cellContent}</td>`;
+                  });
 
+                  return `<tr class="clickable-row" data-genotype-index="${genoIndex}">${rowData.join("")}</tr>`;
+              }).join("")}</tbody>`;
+              return `<table class="table">${headerHTML}${bodyHTML}</table>`;
+          }
+          
+          // *** ADD THIS NEW FUNCTION ***
+          function applyReviewView() {
+              const containers = [dom.reviewTableContainer, dom.resultsTableContainer];
+              containers.forEach(container => {
+                  if (isCardView) {
+                      container.classList.add('card-view');
+                  } else {
+                      container.classList.remove('card-view');
+                  }
+              });
+              dom.viewToggleBtn.textContent = isCardView ? 'Switch to Table View' : 'Switch to Card View';
+              saveSettings();
+          }
+
+          // *** ADD THIS NEW FUNCTION ***
+          function filterGenotypes() {
+              const query = dom.genotypeFilterInput.value.toLowerCase().trim();
+              const rows = document.querySelectorAll("#export-step .clickable-row");
+              
+              rows.forEach(row => {
+                  const genotypeName = row.querySelector('td[data-label="Genotype"]').textContent.toLowerCase();
+                  if (genotypeName.includes(query)) {
+                      row.style.display = ""; // Show row
+                  } else {
+                      row.style.display = "none"; // Hide row
+                  }
+              });
+          }
+          
           function exportFile(data, fileName, mimeType = 'text/plain;charset=utf-8', trialFolderName = '') {
               const blob = data instanceof Blob ? data : new Blob([data], { type: mimeType });
               
@@ -1548,6 +1699,8 @@
               dom.trialGenotypesInput.value = '';
               dom.trialCharactersInput.value = '';
               dom.trialIdInput.disabled = false;
+              dom.trialIdWarning.textContent = '(Cannot be changed later)';
+              dom.trialIdWarning.classList.remove('hidden');
               dom.trialModal.classList.remove('hidden');
           });
 
@@ -1696,9 +1849,78 @@ EXP-01,2025,SUMMER,Rust Screening,"RUST_SCORE:num,NOTES:text",G-01,G-02,G-03</co
           dom.soundToggle.addEventListener('change', (e) => { isSoundEnabled = e.target.checked; saveSettings(); });
           dom.fixedPrevBtn.addEventListener("click", prev);
           dom.fixedNextBtn.addEventListener("click", next);
-          dom.startRecordingBtn.addEventListener('click', () => { if (selectedCharacters.length > 0) startDataEntry(); });
-          dom.backToTrialsFromCharSelectBtn.addEventListener('click', () => updateView('trial'));
+          dom.viewToggleBtn.addEventListener("click", () => {
+              isCardView = !isCardView;
+              applyReviewView();
+          });
+          dom.genotypeFilterInput.addEventListener("input", filterGenotypes);
+          
+          dom.startRecordingBtn.addEventListener('click', () => {
+              if (selectedCharacters.length === 0) return;
+
+              if (isChangingTraits) {
+                  isChangingTraits = false;
+                  showConfirmationPrompt(
+                      "Resume Position?",
+                      "Continue from the current genotype or start over from the beginning?",
+                      () => { // onConfirm: Continue
+                          updateView("entry");
+                          renderCurrentForm();
+                      },
+                      () => { // onCancel: Start Over
+                          state.currentIndex = 0;
+                          updateView("entry");
+                          renderCurrentForm();
+                      },
+                      "Continue",
+                      "Start Over"
+                  );
+                  return;
+              }
+              
+              const savedStateString = localStorage.getItem(getStorageKey(currentTrial.internalId));
+              if (savedStateString) {
+                  const savedState = JSON.parse(savedStateString);
+                  const savedChars = savedState.selectedCharacters || [];
+                  const currentChars = selectedCharacters.map(c => c.name);
+                  savedChars.sort();
+                  currentChars.sort();
+
+                  if (JSON.stringify(savedChars) === JSON.stringify(currentChars) && savedState.currentIndex > 0) {
+                      showConfirmationPrompt(
+                          "Resume Session?",
+                          "You've selected the same traits as last time. Would you like to resume where you left off?",
+                          () => { 
+                              state = savedState;
+                              updateView("entry");
+                              renderCurrentForm();
+                          },
+                          () => { 
+                              startDataEntry();
+                          },
+                          "Yes, Resume",
+                          "No, Start Over"
+                      );
+                      return;
+                  }
+              }
+              startDataEntry();
+          });
+          
+          dom.backToTrialsFromCharSelectBtn.addEventListener('click', () => {
+              if (isChangingTraits) {
+                  isChangingTraits = false;
+                  updateView('entry'); // Go back to the entry screen
+              } else {
+                  updateView('trial'); // Go back to the trial list
+              }
+          });
           dom.changeTrialBtn.addEventListener("click", backToTrialSelection);
+          dom.changeTraitsBtn.addEventListener("click", () => {
+              isChangingTraits = true;
+              updateView('character');
+              renderCharacterSelection();
+          });
           dom.goToSummaryBtn.addEventListener("click", prepareExportScreen);
           dom.backToTrialsBtn.addEventListener("click", backToTrialSelection);
           dom.exportCsvBtn.addEventListener("click", exportCSV);
@@ -1799,16 +2021,25 @@ EXP-01,2025,SUMMER,Rust Screening,"RUST_SCORE:num,NOTES:text",G-01,G-02,G-03</co
           
           dom.characterSelectionContainer.addEventListener('change', (e) => {
               if (e.target.type === 'checkbox') {
-                  const allCheckboxes = Array.from(dom.characterSelectionContainer.querySelectorAll('input:checked'));
-                  selectedCharacters = allCheckboxes.map(cb => {
-                      const name = cb.dataset.charName;
-                      return currentTrial.characters.find(c => c.name === name);
-                  });
-                  if (selectedCharacters.length > characterLimit) {
-                      e.target.checked = false;
-                      selectedCharacters.pop();
-                      showModalAlert('Limit Reached', `You can select a maximum of ${characterLimit} characters at a time.`, () => dom.alertModal.classList.add('hidden'));
+                  const charName = e.target.dataset.charName;
+                  const isChecked = e.target.checked;
+                  const character = currentTrial.characters.find(c => c.name === charName);
+
+                  if (isChecked) {
+                      // Add the character if it's not already in the list
+                      if (!selectedCharacters.some(sc => sc.name === charName)) {
+                          if (selectedCharacters.length < characterLimit) {
+                              selectedCharacters.push(character);
+                          } else {
+                              e.target.checked = false; // Revert the checkbox
+                              showModalAlert('Limit Reached', `You can select a maximum of ${characterLimit} characters.`, () => dom.alertModal.classList.add('hidden'));
+                          }
+                      }
+                  } else {
+                      // Remove the character from the list
+                      selectedCharacters = selectedCharacters.filter(sc => sc.name !== charName);
                   }
+                  
                   dom.startRecordingBtn.disabled = selectedCharacters.length === 0;
               }
           });
@@ -1829,6 +2060,8 @@ EXP-01,2025,SUMMER,Rust Screening,"RUST_SCORE:num,NOTES:text",G-01,G-02,G-03</co
                   dom.trialModalTitle.textContent = 'Edit Trial';
                   dom.trialIdInput.value = trialToActOn.trialId;
                   dom.trialIdInput.disabled = true;
+                  dom.trialIdWarning.textContent = '(Cannot be edited)';
+                  dom.trialIdWarning.classList.remove('hidden');
                   dom.trialYearInput.value = trialToActOn.year;
                   dom.trialSeasonInput.value = trialToActOn.season;
                   dom.trialNameInput.value = trialToActOn.name;
@@ -1856,7 +2089,8 @@ EXP-01,2025,SUMMER,Rust Screening,"RUST_SCORE:num,NOTES:text",G-01,G-02,G-03</co
               initAudio();
               loadSettings();
               loadTrials();
-              const lastTrialInternalId = localStorage.getItem("lastActiveTrial");
+              updateView("trial");
+            /* const lastTrialInternalId = localStorage.getItem("lastActiveTrial");
               
               if (lastTrialInternalId && trials.some(t=> t.internalId === lastTrialInternalId)) {
                   const lastTrial = trials.find(t=> t.internalId === lastTrialInternalId);
@@ -1876,6 +2110,7 @@ EXP-01,2025,SUMMER,Rust Screening,"RUST_SCORE:num,NOTES:text",G-01,G-02,G-03</co
               } else {
                   updateView("trial");
               }
+              */
           }
 
           initialize();

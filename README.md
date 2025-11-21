@@ -1,6 +1,6 @@
 <h1 align="center" id="title">Multi-Trail-Data-Recorder</h1>
 
-[![Android CI](https://github.com/S-Sarath10/Multi-Trail-Data-Recorder/actions/workflows/android.yml/badge.svg)](https://github.com/S-Sarath10/Multi-Trail-Data-Recorder/actions/workflows/android.yml)
+[![Android Release](https://github.com/S-Sarath10/Multi-Trail-Data-Recorder/actions/workflows/main.yml/badge.svg)](https://github.com/S-Sarath10/Multi-Trail-Data-Recorder/actions/workflows/main.yml)
 
 ----
 # Multi-Trail-Data-Recorder

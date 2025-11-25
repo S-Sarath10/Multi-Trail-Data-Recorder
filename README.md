@@ -1,11 +1,19 @@
 <h1 align="center" id="title">Multi-Trail-Data-Recorder</h1>
 
 [![Android Release](https://github.com/S-Sarath10/Multi-Trail-Data-Recorder/actions/workflows/main.yml/badge.svg)](https://github.com/S-Sarath10/Multi-Trail-Data-Recorder/actions/workflows/main.yml)
+![Static Badge](https://img.shields.io/badge/Waring%20-%20Read%20data%20loss%20instruction%20-%20brightyellow?style=flat&labelColor=yellow&color=red&link=https%3A%2F%2Fgithub.com%2FS-Sarath10%2FMulti-Trail-Data-Recorder%2Fedit%2Fmaster%2FREADME.md%23-data-loss-warning)
+
 
 ----
 # Multi-Trail-Data-Recorder
 
 A simple web-based application for recording agricultural field trial data points, designed for easy use on Android devices and web browsers.
+
+## 🚨 Data Loss Warning
+Updating, uninstalling, or reinstalling the app will erase all locally stored data.  
+By using this app, you acknowledge the possibility of data loss.
+
+**Tip:** After each session, save and back up your files to prevent accidental loss.
 
 ## About
 

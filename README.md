@@ -1,8 +1,9 @@
 <h1 align="center" id="title">Multi-Trail-Data-Recorder</h1>
 
 [![Android Release](https://github.com/S-Sarath10/Multi-Trail-Data-Recorder/actions/workflows/main.yml/badge.svg)](https://github.com/S-Sarath10/Multi-Trail-Data-Recorder/actions/workflows/main.yml)
-![Static Badge](https://img.shields.io/badge/Waring%20-%20Read%20data%20loss%20instruction%20-%20brightyellow?style=flat&labelColor=yellow&color=red&link=https%3A%2F%2Fgithub.com%2FS-Sarath10%2FMulti-Trail-Data-Recorder%2Fedit%2Fmaster%2FREADME.md%23-data-loss-warning)
+![GitHub License](https://img.shields.io/github/license/S-Sarath10/Multi-Trail-Data-Recorder)
 
+![Static Badge](https://img.shields.io/badge/Waring%20-%20Read%20data%20loss%20instruction%20-%20grey?style=flat&labelColor=grey&color=red&link=https%3A%2F%2Fgithub.com%2FS-Sarath10%2FMulti-Trail-Data-Recorder%2Fedit%2Fmaster%2FREADME.md%23-data-loss-warning)
 
 ----
 # Multi-Trail-Data-Recorder

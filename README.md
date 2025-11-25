@@ -11,7 +11,7 @@
 A simple web-based application for recording agricultural field trial data points, designed for easy use on Android devices and web browsers.
 
 ## 🚨 Data Loss Warning
-Updating, uninstalling, or reinstalling the app will erase all locally stored data.  
+Updating, uninstalling, or reinstalling the app will erase all locally stored app data (saved/downloaded data won't be affected).  
 By using this app, you acknowledge the possibility of data loss.
 
 **Tip:** After each session, save and back up your files to prevent accidental loss.

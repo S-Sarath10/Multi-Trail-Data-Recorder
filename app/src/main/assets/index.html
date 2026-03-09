@@ -2766,27 +2766,6 @@
               loadSettings();
               loadTrials();
               updateView("trial");
-              /* const lastTrialInternalId = localStorage.getItem("lastActiveTrial");
- 
-                if (lastTrialInternalId && trials.some(t=> t.internalId === lastTrialInternalId)) {
-                    const lastTrial = trials.find(t=> t.internalId === lastTrialInternalId);
-                    showConfirmationPrompt(
-                        "Resume Session?",
-                        `Resume last session for "${getTrialFullName(lastTrial)}"?`,
-                        () => { // onConfirm
-                            loadTrial(lastTrialInternalId);
-                        },
-                        () => { // onCancel
-                            localStorage.removeItem("lastActiveTrial");
-                            updateView('trial');
-                        },
-                        "Yes, Resume",
-                        "No, Start Over"
-                    );
-                } else {
-                    updateView("trial");
-                }
-                */
             }
             initialize();
 
@@ -2807,4 +2786,5 @@
     </script>
   </footer>
 </body>
+
 </html>

@@ -5,9 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Multi-Trial Data Recorder</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="fonts/poppins.css" />
     <style>
         /* --- CSS Variables for Theming --- */
         :root {
@@ -1030,7 +1028,10 @@
             </div>
             <div class="button-group" style="margin-bottom: 1.5rem">
                 <button id="export-csv-btn" class="btn btn-primary">
-                    Export Selected (CSV)
+                    Export Wide CSV
+                </button>
+                <button id="export-tidy-csv-btn" class="btn btn-accent">
+                    Export Tidy CSV
                 </button>
                 <button id="export-json-btn" class="btn btn-secondary">
                     Export Selected (JSON)
@@ -1138,6 +1139,18 @@
                 <div style="display:flex;gap:0.5rem;align-items:center;">
                     <input type="number" id="vibrate-prev-input" class="input" min="0" max="500" style="width:6rem;">
                     <button id="vibrate-prev-reset-btn" class="btn btn-ghost btn-xs">Reset</button>
+                </div>
+            </div>
+            <div class="form-control">
+                <label class="label">Missing Value Indicator
+                    <span style="font-size:0.7rem;font-weight:400;opacity:0.6;margin-left:0.4rem;">used in CSV exports for empty numeric cells</span>
+                </label>
+                <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+                    <input type="text" id="missing-value-input" class="input" style="width:7rem;" maxlength="10" placeholder='e.g. NA'>
+                    <button data-mv="NA"   class="btn btn-ghost btn-xs mv-preset">NA</button>
+                    <button data-mv="NaN"  class="btn btn-ghost btn-xs mv-preset">NaN</button>
+                    <button data-mv="-999" class="btn btn-ghost btn-xs mv-preset">-999</button>
+                    <button data-mv=""     class="btn btn-ghost btn-xs mv-preset">Empty</button>
                 </div>
             </div>
         </div>
@@ -1267,1742 +1280,1809 @@
 
 <footer class="site-footer">
     Copyright &copy; <span id="year"></span>
-    <a href="https://github.com/Sarath-SD10/Multi-Trail-Data-Recorder" target="_blank">
-        <script>
-            document.addEventListener("DOMContentLoaded", () => {
-              try {
-                // --- STATE & DOM ---
-                let state = {};
-                let trials = [];
-                let currentTrial = null;
-                let selectedCharacters = [];
-                let editingTrialInternalId = null;
-                let characterLimit = 6;
-                let vibrateNext = 30;
-                let vibratePrev = 30;
-                const VIBRATE_DEFAULT = 30;
-                let cameraStream = null;
-                let isChangingTraits = false;
-                let isCardView = true;
+    <a href="https://github.com/Sarath-SD10/Multi-Trail-Data-Recorder" target="_blank">MLTDR</a>
+    <script>
+        document.getElementById("year").textContent = new Date().getFullYear();
+    </script>
+</footer>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+      try {
+            // --- STATE & DOM ---
+            let state = {};
+            let trials = [];
+            let currentTrial = null;
+            let selectedCharacters = [];
+            let editingTrialInternalId = null;
+            let characterLimit = 6;
+            let vibrateNext = 30;
+            let vibratePrev = 30;
+            const VIBRATE_DEFAULT = 30;
+            let missingValueIndicator = 'NA';
+            let cameraStream = null;
+            let isChangingTraits = false;
+            let isCardView = true;
 
-                const dom = {
-                  trialIdInput: document.getElementById("trial-id-input"),
-                  trialIdWarning: document.getElementById("trial-id-warning"),
-                  trialYearInput: document.getElementById("trial-year-input"),
-                  trialSeasonInput: document.getElementById("trial-season-input"),
-                  app: document.getElementById("app"),
-                  trialStep: document.getElementById("trial-step"),
-                  characterStep: document.getElementById("character-step"),
-                  entryStep: document.getElementById("entry-step"),
-                  exportStep: document.getElementById("export-step"),
-                  headerSubtitle: document.getElementById("header-subtitle"),
-                  entryTitle: document.getElementById("entry-title"),
-                  exportTitle: document.getElementById("export-title"),
-                  settingsBtn: document.getElementById("settings-btn"),
-                  settingsModal: document.getElementById("settings-modal"),
-                  settingsModalCloseBtn: document.getElementById("settings-modal-close-btn"),
-                  charLimitInput: document.getElementById("char-limit-input"),
-                  charLimitDisplay: document.getElementById("char-limit-display"),
-                  vibrateNextInput: document.getElementById('vibrate-next-input'),
-                  vibratePrevInput: document.getElementById('vibrate-prev-input'),
-                  vibrateNextResetBtn: document.getElementById('vibrate-next-reset-btn'),
-                  vibratePrevResetBtn: document.getElementById('vibrate-prev-reset-btn'),
-                  clearAllDataBtn: document.getElementById("clear-all-data-btn"),
-                  exportDbBtn: document.getElementById("export-db-btn"),
-                  importDbBtn: document.getElementById("import-db-btn"),
-                  dbImporter: document.getElementById("db-importer"),
-                  cameraModal: document.getElementById("camera-modal"),
-                  cameraVideo: document.getElementById("camera-video"),
-                  capturePhotoBtn: document.getElementById("capture-photo-btn"),
-                  cameraCloseBtn: document.getElementById("camera-close-btn"),
-                  fixedNavContainer: document.getElementById("fixed-nav-container"),
-                  fixedPrevBtn: document.getElementById("fixed-prev-btn"),
-                  fixedNextBtn: document.getElementById("fixed-next-btn"),
-                  addTrialBtn: document.getElementById("add-trial-btn"),
-                  importTrialBtn: document.getElementById("import-trial-btn"),
-                  exportAllExcelBtn: document.getElementById("export-all-excel-btn"),
-                  fileImporter: document.getElementById("file-importer"),
-                  trialButtonsContainer: document.getElementById("trial-buttons-container"),
-                  trialModal: document.getElementById("trial-modal"),
-                  trialModalTitle: document.getElementById("trial-modal-title"),
-                  trialNameInput: document.getElementById("trial-name-input"),
-                  trialGenotypesInput: document.getElementById("trial-genotypes-input"),
-                  trialCharactersInput: document.getElementById("trial-characters-input"),
-                  trialTagsInput: document.getElementById('trial-tags-input'),
-                  trialPlantingDateInput: document.getElementById('trial-planting-date-input'),
-                  trialModalCancelBtn: document.getElementById("trial-modal-cancel-btn"),
-                  trialModalSaveBtn: document.getElementById("trial-modal-save-btn"),
-                  charSelectTrialName: document.getElementById("char-select-trial-name"),
-                  characterSelectionContainer: document.getElementById("character-selection-container"),
-                  startRecordingBtn: document.getElementById("start-recording-btn"),
-                  backToTrialsFromCharSelectBtn: document.getElementById("back-to-trials-from-char-select-btn"),
-                  changeTrialBtn: document.getElementById("change-trial-btn"),
-                  goToSummaryBtn: document.getElementById("go-to-summary-btn"),
-                  changeTraitsBtn: document.getElementById("change-traits-btn"),
-                  backToTrialsBtn: document.getElementById("back-to-trials-btn"),
-                  actionsContainer: document.getElementById("actions-container"),
-                  entryForm: document.getElementById("entry-form"),
-                  toggleRemarksBtn: document.getElementById("toggle-remarks-btn"),
-                  remarksWrapper: document.getElementById("remarks-wrapper"),
-                  remarksInput: document.getElementById("remarks-input"),
-                  genotypeTitle: document.getElementById("genotype-title"),
-                  progressBar: document.getElementById("progress-bar"),
-                  progressText: document.getElementById("progress-text"),
-                  exportCsvBtn: document.getElementById("export-csv-btn"),
-                  exportJsonBtn: document.getElementById("export-json-btn"),
-                  reviewSection: document.getElementById("review-section"),
-                  reviewTableContainer: document.getElementById("review-table-container"),
-                  resultsTableContainer: document.getElementById("results-table-container"),
-                  backToEditBtn: document.getElementById("back-to-edit-btn"),
-                  genotypeFilterInput: document.getElementById("genotype-filter-input"),
-                  viewToggleBtn: document.getElementById("view-toggle-btn"),
-                  alertModal: document.getElementById("alert-modal"),
-                  modalTitle: document.getElementById("modal-title"),
-                  modalContent: document.getElementById("modal-content"),
-                  modalCloseBtn: document.getElementById("modal-close-btn"),
+            const dom = {
+              trialIdInput: document.getElementById("trial-id-input"),
+              trialIdWarning: document.getElementById("trial-id-warning"),
+              trialYearInput: document.getElementById("trial-year-input"),
+              trialSeasonInput: document.getElementById("trial-season-input"),
+              app: document.getElementById("app"),
+              trialStep: document.getElementById("trial-step"),
+              characterStep: document.getElementById("character-step"),
+              entryStep: document.getElementById("entry-step"),
+              exportStep: document.getElementById("export-step"),
+              headerSubtitle: document.getElementById("header-subtitle"),
+              entryTitle: document.getElementById("entry-title"),
+              exportTitle: document.getElementById("export-title"),
+              settingsBtn: document.getElementById("settings-btn"),
+              settingsModal: document.getElementById("settings-modal"),
+              settingsModalCloseBtn: document.getElementById("settings-modal-close-btn"),
+              charLimitInput: document.getElementById("char-limit-input"),
+              charLimitDisplay: document.getElementById("char-limit-display"),
+              vibrateNextInput: document.getElementById('vibrate-next-input'),
+              vibratePrevInput: document.getElementById('vibrate-prev-input'),
+              vibrateNextResetBtn: document.getElementById('vibrate-next-reset-btn'),
+              vibratePrevResetBtn: document.getElementById('vibrate-prev-reset-btn'),
+              clearAllDataBtn: document.getElementById("clear-all-data-btn"),
+              exportDbBtn: document.getElementById("export-db-btn"),
+              importDbBtn: document.getElementById("import-db-btn"),
+              dbImporter: document.getElementById("db-importer"),
+              cameraModal: document.getElementById("camera-modal"),
+              cameraVideo: document.getElementById("camera-video"),
+              capturePhotoBtn: document.getElementById("capture-photo-btn"),
+              cameraCloseBtn: document.getElementById("camera-close-btn"),
+              fixedNavContainer: document.getElementById("fixed-nav-container"),
+              fixedPrevBtn: document.getElementById("fixed-prev-btn"),
+              fixedNextBtn: document.getElementById("fixed-next-btn"),
+              addTrialBtn: document.getElementById("add-trial-btn"),
+              importTrialBtn: document.getElementById("import-trial-btn"),
+              exportAllExcelBtn: document.getElementById("export-all-excel-btn"),
+              fileImporter: document.getElementById("file-importer"),
+              trialButtonsContainer: document.getElementById("trial-buttons-container"),
+              trialModal: document.getElementById("trial-modal"),
+              trialModalTitle: document.getElementById("trial-modal-title"),
+              trialNameInput: document.getElementById("trial-name-input"),
+              trialGenotypesInput: document.getElementById("trial-genotypes-input"),
+              trialCharactersInput: document.getElementById("trial-characters-input"),
+              trialTagsInput: document.getElementById('trial-tags-input'),
+              trialPlantingDateInput: document.getElementById('trial-planting-date-input'),
+              trialModalCancelBtn: document.getElementById("trial-modal-cancel-btn"),
+              trialModalSaveBtn: document.getElementById("trial-modal-save-btn"),
+              charSelectTrialName: document.getElementById("char-select-trial-name"),
+              characterSelectionContainer: document.getElementById("character-selection-container"),
+              startRecordingBtn: document.getElementById("start-recording-btn"),
+              backToTrialsFromCharSelectBtn: document.getElementById("back-to-trials-from-char-select-btn"),
+              changeTrialBtn: document.getElementById("change-trial-btn"),
+              goToSummaryBtn: document.getElementById("go-to-summary-btn"),
+              changeTraitsBtn: document.getElementById("change-traits-btn"),
+              backToTrialsBtn: document.getElementById("back-to-trials-btn"),
+              actionsContainer: document.getElementById("actions-container"),
+              entryForm: document.getElementById("entry-form"),
+              toggleRemarksBtn: document.getElementById("toggle-remarks-btn"),
+              remarksWrapper: document.getElementById("remarks-wrapper"),
+              remarksInput: document.getElementById("remarks-input"),
+              genotypeTitle: document.getElementById("genotype-title"),
+              progressBar: document.getElementById("progress-bar"),
+              progressText: document.getElementById("progress-text"),
+              exportCsvBtn: document.getElementById("export-csv-btn"),
+              exportTidyCsvBtn: document.getElementById("export-tidy-csv-btn"),
+              exportJsonBtn: document.getElementById("export-json-btn"),
+              missingValueInput: document.getElementById("missing-value-input"),
+              reviewSection: document.getElementById("review-section"),
+              reviewTableContainer: document.getElementById("review-table-container"),
+              resultsTableContainer: document.getElementById("results-table-container"),
+              backToEditBtn: document.getElementById("back-to-edit-btn"),
+              genotypeFilterInput: document.getElementById("genotype-filter-input"),
+              viewToggleBtn: document.getElementById("view-toggle-btn"),
+              alertModal: document.getElementById("alert-modal"),
+              modalTitle: document.getElementById("modal-title"),
+              modalContent: document.getElementById("modal-content"),
+              modalCloseBtn: document.getElementById("modal-close-btn"),
+            };
+
+            function saveSettings() {
+              const settings = {
+                charLimit: characterLimit,
+                view: isCardView,
+                vibrateNext,
+                vibratePrev,
+                missingValue: missingValueIndicator
+              };
+              localStorage.setItem('plantRecorderSettings', JSON.stringify(settings));
+            }
+
+            function loadSettings() {
+              const settings = JSON.parse(localStorage.getItem('plantRecorderSettings')) || {};
+              characterLimit = settings.charLimit || 6;
+              isCardView = settings.view !== false;
+              vibrateNext = settings?.vibrateNext ?? VIBRATE_DEFAULT;
+              vibratePrev = settings?.vibratePrev ?? VIBRATE_DEFAULT;
+              missingValueIndicator = settings.missingValue !== undefined ? settings.missingValue : 'NA';
+              dom.charLimitInput.value = characterLimit;
+              dom.charLimitDisplay.textContent = characterLimit;
+              dom.vibrateNextInput.value = vibrateNext;
+              dom.vibratePrevInput.value = vibratePrev;
+              dom.missingValueInput.value = missingValueIndicator;
+            }
+
+            function getTrialFullName(trial) {
+              if (!trial) return "";
+              return `${trial.trialId}-${trial.year}${trial.season}-${trial.name}`;
+            }
+
+            function getFormattedDate() {
+              const date = new Date();
+              const year = date.getFullYear();
+              const month = (date.getMonth() + 1).toString().padStart(2, '0');
+              const day = date.getDate().toString().padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+
+            function updateView(screen) {
+              dom.trialStep.classList.add("hidden");
+              dom.characterStep.classList.add("hidden");
+              dom.entryStep.classList.add("hidden");
+              dom.exportStep.classList.add("hidden");
+              dom.fixedNavContainer.classList.add('hidden');
+
+              if (dom[screen + "Step"]) {
+                dom[screen + "Step"].classList.remove("hidden");
+              }
+              if (screen === 'entry') {
+                dom.fixedNavContainer.classList.remove('hidden');
+              }
+              if (screen === 'character') {
+                dom.startRecordingBtn.textContent = isChangingTraits ? 'Continue Recording' : 'Start Recording';
+              }
+
+              const trialName = currentTrial ? getTrialFullName(currentTrial) : 'No Trial Selected';
+              const titles = {
+                trial: 'Manage your trials or select one to begin.',
+                character: `Select characters for: ${trialName}`,
+                entry: `Recording data for: ${trialName}`,
+                export: `Reviewing data for: ${trialName}`
+              };
+              dom.headerSubtitle.textContent = titles[screen] || '';
+            }
+
+            function showModalAlert(title, message, onConfirm, confirmText = 'OK') {
+              dom.modalTitle.textContent = title;
+              dom.modalContent.innerHTML = message;
+
+              const modalBox = dom.alertModal.querySelector('.modal-box');
+              let oldActions = modalBox.querySelector(".modal-actions");
+              if (oldActions) oldActions.remove();
+
+              const actionsDiv = document.createElement('div');
+              actionsDiv.className = 'modal-actions';
+
+              if (onConfirm) {
+                const btn = document.createElement("button");
+                btn.textContent = confirmText;
+                btn.className = "btn btn-primary";
+                btn.onclick = () => onConfirm();
+                actionsDiv.appendChild(btn);
+              }
+
+              modalBox.appendChild(actionsDiv);
+              dom.alertModal.classList.remove("hidden");
+            }
+
+            function showConfirmationPrompt(title, message, onConfirm, onCancel, confirmText = 'Yes', cancelText = 'No') {
+              dom.modalTitle.textContent = title;
+              dom.modalContent.innerHTML = message;
+
+              const modalBox = dom.alertModal.querySelector('.modal-box');
+              let oldActions = modalBox.querySelector(".modal-actions");
+              if (oldActions) oldActions.remove();
+
+              const actionsDiv = document.createElement('div');
+              actionsDiv.className = 'modal-actions';
+
+              const cancelBtn = document.createElement("button");
+              cancelBtn.textContent = cancelText;
+              cancelBtn.className = "btn btn-ghost";
+              cancelBtn.onclick = () => {
+                dom.alertModal.classList.add('hidden');
+                if (onCancel) onCancel();
+              };
+
+              const confirmBtn = document.createElement("button");
+              confirmBtn.textContent = confirmText;
+              confirmBtn.className = "btn btn-primary";
+              confirmBtn.onclick = () => {
+                dom.alertModal.classList.add('hidden');
+                if (onConfirm) onConfirm();
+              };
+
+              actionsDiv.appendChild(cancelBtn);
+              actionsDiv.appendChild(confirmBtn);
+              modalBox.appendChild(actionsDiv);
+
+              dom.alertModal.classList.remove("hidden");
+            }
+
+            function showMergePrompt(newTrial, existingTrial) {
+              return new Promise((resolve) => {
+                const title = "Potential Merge Detected";
+                const message = `
+                            <p>An imported trial has the same name as an existing one:</p>
+                            <p style="font-weight: bold; margin: 0.5rem 0; padding: 0.5rem; background-color: var(--base-200); border-radius: 0.25rem;">${newTrial.name}</p>
+                            <p>What would you like to do?</p>
+                        `;
+                dom.modalTitle.textContent = title;
+                dom.modalContent.innerHTML = message;
+
+                const modalBox = dom.alertModal.querySelector('.modal-box');
+                let oldActions = modalBox.querySelector(".modal-actions");
+                if (oldActions) oldActions.remove();
+
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'modal-actions';
+
+                const mergeBtn = document.createElement("button");
+                mergeBtn.textContent = "Merge";
+                mergeBtn.className = "btn btn-primary";
+                mergeBtn.onclick = () => { dom.alertModal.classList.add('hidden'); resolve('merge'); };
+
+                const newBtn = document.createElement("button");
+                newBtn.textContent = "Import as New";
+                newBtn.className = "btn btn-secondary";
+                newBtn.onclick = () => { dom.alertModal.classList.add('hidden'); resolve('new'); };
+
+                const skipBtn = document.createElement("button");
+                skipBtn.textContent = "Skip";
+                skipBtn.className = "btn btn-ghost";
+                skipBtn.onclick = () => { dom.alertModal.classList.add('hidden'); resolve('skip'); };
+
+                actionsDiv.appendChild(skipBtn);
+                actionsDiv.appendChild(newBtn);
+                actionsDiv.appendChild(mergeBtn);
+                modalBox.appendChild(actionsDiv);
+                dom.alertModal.classList.remove("hidden");
+              });
+            }
+
+            function backToTrialSelection() {
+              showConfirmationPrompt(
+                "Change Trial?",
+                "Your progress is saved. Return to trial selection?",
+                () => {
+                  currentTrial = null;
+                  state = {};
+                  updateView("trial");
+                },
+                null,
+                "Yes, Change Trial",
+                "Cancel"
+              );
+            }
+
+            // --- IndexedDB helper ---
+            // Opens (or creates) the database and returns a Promise<IDBDatabase>.
+            // Two object stores:
+            //   "trials"      - one record per trial definition  (keyPath: internalId)
+            //   "trialStates" - one record per trial entry data  (keyPath: internalId)
+            let _db = null;
+            function openDB() {
+              if (_db) return Promise.resolve(_db);
+              return new Promise((resolve, reject) => {
+                const req = indexedDB.open('plantRecorderDB', 1);
+                req.onupgradeneeded = (e) => {
+                  const db = e.target.result;
+                  if (!db.objectStoreNames.contains('trials'))
+                    db.createObjectStore('trials', { keyPath: 'internalId' });
+                  if (!db.objectStoreNames.contains('trialStates'))
+                    db.createObjectStore('trialStates', { keyPath: 'internalId' });
                 };
+                req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
+                req.onerror   = (e) => reject(e.target.error);
+              });
+            }
+            function dbPut(storeName, record) {
+              return openDB().then(db => new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readwrite');
+                tx.objectStore(storeName).put(record);
+                tx.oncomplete = () => resolve();
+                tx.onerror    = (e) => reject(e.target.error);
+              }));
+            }
+            function dbGet(storeName, key) {
+              return openDB().then(db => new Promise((resolve, reject) => {
+                const req = db.transaction(storeName, 'readonly')
+                              .objectStore(storeName).get(key);
+                req.onsuccess = (e) => resolve(e.target.result ?? null);
+                req.onerror   = (e) => reject(e.target.error);
+              }));
+            }
+            function dbGetAll(storeName) {
+              return openDB().then(db => new Promise((resolve, reject) => {
+                const req = db.transaction(storeName, 'readonly')
+                              .objectStore(storeName).getAll();
+                req.onsuccess = (e) => resolve(e.target.result);
+                req.onerror   = (e) => reject(e.target.error);
+              }));
+            }
+            function dbDelete(storeName, key) {
+              return openDB().then(db => new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readwrite');
+                tx.objectStore(storeName).delete(key);
+                tx.oncomplete = () => resolve();
+                tx.onerror    = (e) => reject(e.target.error);
+              }));
+            }
+            function dbClear(storeName) {
+              return openDB().then(db => new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readwrite');
+                tx.objectStore(storeName).clear();
+                tx.oncomplete = () => resolve();
+                tx.onerror    = (e) => reject(e.target.error);
+              }));
+            }
 
-                function saveSettings() {
-                  const settings = {
-                    charLimit: characterLimit,
-                    view: isCardView,
-                    vibrateNext,
-                    vibratePrev
-                  };
-                  localStorage.setItem('plantRecorderSettings', JSON.stringify(settings));
-                }
-
-                function loadSettings() {
-                  const settings = JSON.parse(localStorage.getItem('plantRecorderSettings')) || {};
-                  characterLimit = settings.charLimit || 6;
-                  isCardView = settings.view !== false;
-                  vibrateNext = settings?.vibrateNext ?? VIBRATE_DEFAULT;
-                  vibratePrev = settings?.vibratePrev ?? VIBRATE_DEFAULT;
-                  dom.charLimitInput.value = characterLimit;
-                  dom.charLimitDisplay.textContent = characterLimit;
-                  dom.vibrateNextInput.value = vibrateNext;
-                  dom.vibratePrevInput.value = vibratePrev;
-                }
-
-                function getTrialFullName(trial) {
-                  if (!trial) return "";
-                  return `${trial.trialId}-${trial.year}${trial.season}-${trial.name}`;
-                }
-
-                function getFormattedDate() {
-                  const date = new Date();
-                  const year = date.getFullYear();
-                  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                  const day = date.getDate().toString().padStart(2, '0');
-                  return `${year}-${month}-${day}`;
-                }
-
-                function updateView(screen) {
-                  dom.trialStep.classList.add("hidden");
-                  dom.characterStep.classList.add("hidden");
-                  dom.entryStep.classList.add("hidden");
-                  dom.exportStep.classList.add("hidden");
-                  dom.fixedNavContainer.classList.add('hidden');
-
-                  if (dom[screen + "Step"]) {
-                    dom[screen + "Step"].classList.remove("hidden");
-                  }
-                  if (screen === 'entry') {
-                    dom.fixedNavContainer.classList.remove('hidden');
-                  }
-                  if (screen === 'character') {
-                    dom.startRecordingBtn.textContent = isChangingTraits ? 'Continue Recording' : 'Start Recording';
-                  }
-
-                  const trialName = currentTrial ? getTrialFullName(currentTrial) : 'No Trial Selected';
-                  const titles = {
-                    trial: 'Manage your trials or select one to begin.',
-                    character: `Select characters for: ${trialName}`,
-                    entry: `Recording data for: ${trialName}`,
-                    export: `Reviewing data for: ${trialName}`
-                  };
-                  dom.headerSubtitle.textContent = titles[screen] || '';
-                }
-
-                function showModalAlert(title, message, onConfirm, confirmText = 'OK') {
-                  dom.modalTitle.textContent = title;
-                  dom.modalContent.innerHTML = message;
-
-                  const modalBox = dom.alertModal.querySelector('.modal-box');
-                  let oldActions = modalBox.querySelector(".modal-actions");
-                  if (oldActions) oldActions.remove();
-
-                  const actionsDiv = document.createElement('div');
-                  actionsDiv.className = 'modal-actions';
-
-                  if (onConfirm) {
-                    const btn = document.createElement("button");
-                    btn.textContent = confirmText;
-                    btn.className = "btn btn-primary";
-                    btn.onclick = () => onConfirm();
-                    actionsDiv.appendChild(btn);
-                  }
-
-                  modalBox.appendChild(actionsDiv);
-                  dom.alertModal.classList.remove("hidden");
-                }
-
-                function showConfirmationPrompt(title, message, onConfirm, onCancel, confirmText = 'Yes', cancelText = 'No') {
-                  dom.modalTitle.textContent = title;
-                  dom.modalContent.innerHTML = message;
-
-                  const modalBox = dom.alertModal.querySelector('.modal-box');
-                  let oldActions = modalBox.querySelector(".modal-actions");
-                  if (oldActions) oldActions.remove();
-
-                  const actionsDiv = document.createElement('div');
-                  actionsDiv.className = 'modal-actions';
-
-                  const cancelBtn = document.createElement("button");
-                  cancelBtn.textContent = cancelText;
-                  cancelBtn.className = "btn btn-ghost";
-                  cancelBtn.onclick = () => {
-                    dom.alertModal.classList.add('hidden');
-                    if (onCancel) onCancel();
-                  };
-
-                  const confirmBtn = document.createElement("button");
-                  confirmBtn.textContent = confirmText;
-                  confirmBtn.className = "btn btn-primary";
-                  confirmBtn.onclick = () => {
-                    dom.alertModal.classList.add('hidden');
-                    if (onConfirm) onConfirm();
-                  };
-
-                  actionsDiv.appendChild(cancelBtn);
-                  actionsDiv.appendChild(confirmBtn);
-                  modalBox.appendChild(actionsDiv);
-
-                  dom.alertModal.classList.remove("hidden");
-                }
-
-                function showMergePrompt(newTrial, existingTrial) {
-                  return new Promise((resolve) => {
-                    const title = "Potential Merge Detected";
-                    const message = `
-                                <p>An imported trial has the same name as an existing one:</p>
-                                <p style="font-weight: bold; margin: 0.5rem 0; padding: 0.5rem; background-color: var(--base-200); border-radius: 0.25rem;">${newTrial.name}</p>
-                                <p>What would you like to do?</p>
-                            `;
-                    dom.modalTitle.textContent = title;
-                    dom.modalContent.innerHTML = message;
-
-                    const modalBox = dom.alertModal.querySelector('.modal-box');
-                    let oldActions = modalBox.querySelector(".modal-actions");
-                    if (oldActions) oldActions.remove();
-
-                    const actionsDiv = document.createElement('div');
-                    actionsDiv.className = 'modal-actions';
-
-                    const mergeBtn = document.createElement("button");
-                    mergeBtn.textContent = "Merge";
-                    mergeBtn.className = "btn btn-primary";
-                    mergeBtn.onclick = () => { dom.alertModal.classList.add('hidden'); resolve('merge'); };
-
-                    const newBtn = document.createElement("button");
-                    newBtn.textContent = "Import as New";
-                    newBtn.className = "btn btn-secondary";
-                    newBtn.onclick = () => { dom.alertModal.classList.add('hidden'); resolve('new'); };
-
-                    const skipBtn = document.createElement("button");
-                    skipBtn.textContent = "Skip";
-                    skipBtn.className = "btn btn-ghost";
-                    skipBtn.onclick = () => { dom.alertModal.classList.add('hidden'); resolve('skip'); };
-
-                    actionsDiv.appendChild(skipBtn);
-                    actionsDiv.appendChild(newBtn);
-                    actionsDiv.appendChild(mergeBtn);
-                    modalBox.appendChild(actionsDiv);
-                    dom.alertModal.classList.remove("hidden");
-                  });
-                }
-
-                function backToTrialSelection() {
-                  showConfirmationPrompt(
-                    "Change Trial?",
-                    "Your progress is saved. Return to trial selection?",
-                    () => {
-                      currentTrial = null;
-                      state = {};
-                      updateView("trial");
-                    },
-                    null,
-                    "Yes, Change Trial",
-                    "Cancel"
-                  );
-                }
-
-                // --- IndexedDB helper ---
-                // Opens (or creates) the database and returns a Promise<IDBDatabase>.
-                // Two object stores:
-                //   "trials"      - one record per trial definition  (keyPath: internalId)
-                //   "trialStates" - one record per trial entry data  (keyPath: internalId)
-                let _db = null;
-                function openDB() {
-                  if (_db) return Promise.resolve(_db);
-                  return new Promise((resolve, reject) => {
-                    const req = indexedDB.open('plantRecorderDB', 1);
-                    req.onupgradeneeded = (e) => {
-                      const db = e.target.result;
-                      if (!db.objectStoreNames.contains('trials'))
-                        db.createObjectStore('trials', { keyPath: 'internalId' });
-                      if (!db.objectStoreNames.contains('trialStates'))
-                        db.createObjectStore('trialStates', { keyPath: 'internalId' });
-                    };
-                    req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
-                    req.onerror   = (e) => reject(e.target.error);
-                  });
-                }
-                function dbPut(storeName, record) {
-                  return openDB().then(db => new Promise((resolve, reject) => {
-                    const tx = db.transaction(storeName, 'readwrite');
-                    tx.objectStore(storeName).put(record);
-                    tx.oncomplete = () => resolve();
-                    tx.onerror    = (e) => reject(e.target.error);
-                  }));
-                }
-                function dbGet(storeName, key) {
-                  return openDB().then(db => new Promise((resolve, reject) => {
-                    const req = db.transaction(storeName, 'readonly')
-                                  .objectStore(storeName).get(key);
-                    req.onsuccess = (e) => resolve(e.target.result ?? null);
-                    req.onerror   = (e) => reject(e.target.error);
-                  }));
-                }
-                function dbGetAll(storeName) {
-                  return openDB().then(db => new Promise((resolve, reject) => {
-                    const req = db.transaction(storeName, 'readonly')
-                                  .objectStore(storeName).getAll();
-                    req.onsuccess = (e) => resolve(e.target.result);
-                    req.onerror   = (e) => reject(e.target.error);
-                  }));
-                }
-                function dbDelete(storeName, key) {
-                  return openDB().then(db => new Promise((resolve, reject) => {
-                    const tx = db.transaction(storeName, 'readwrite');
-                    tx.objectStore(storeName).delete(key);
-                    tx.oncomplete = () => resolve();
-                    tx.onerror    = (e) => reject(e.target.error);
-                  }));
-                }
-                function dbClear(storeName) {
-                  return openDB().then(db => new Promise((resolve, reject) => {
-                    const tx = db.transaction(storeName, 'readwrite');
-                    tx.objectStore(storeName).clear();
-                    tx.oncomplete = () => resolve();
-                    tx.onerror    = (e) => reject(e.target.error);
-                  }));
-                }
-
-                // --- One-time migration from localStorage to IndexedDB ---
-                // Runs once on first load. If old data exists in localStorage
-                // it is copied into IndexedDB and then removed.
-                async function migrateFromLocalStorage() {
-                  const oldTrialsStr = localStorage.getItem('plantRecorderTrials_v2');
-                  if (!oldTrialsStr) return;
-                  try {
-                    const oldTrials = JSON.parse(oldTrialsStr);
-                    for (const trial of oldTrials) {
-                      await dbPut('trials', trial);
-                      const stateKey = `plantRecorderState_${trial.internalId}`;
-                      const stateStr = localStorage.getItem(stateKey);
-                      if (stateStr) {
-                        const stateObj = JSON.parse(stateStr);
-                        stateObj.internalId = trial.internalId;
-                        await dbPut('trialStates', stateObj);
-                        localStorage.removeItem(stateKey);
-                      }
-                    }
-                    localStorage.removeItem('plantRecorderTrials_v2');
-                    localStorage.removeItem('lastActiveTrial');
-                    console.log('Migration complete: localStorage -> IndexedDB');
-                  } catch (err) {
-                    console.error('Migration failed:', err);
+            // --- One-time migration from localStorage to IndexedDB ---
+            // Runs once on first load. If old data exists in localStorage
+            // it is copied into IndexedDB and then removed.
+            async function migrateFromLocalStorage() {
+              const oldTrialsStr = localStorage.getItem('plantRecorderTrials_v2');
+              if (!oldTrialsStr) return;
+              try {
+                const oldTrials = JSON.parse(oldTrialsStr);
+                for (const trial of oldTrials) {
+                  await dbPut('trials', trial);
+                  const stateKey = `plantRecorderState_${trial.internalId}`;
+                  const stateStr = localStorage.getItem(stateKey);
+                  if (stateStr) {
+                    const stateObj = JSON.parse(stateStr);
+                    stateObj.internalId = trial.internalId;
+                    await dbPut('trialStates', stateObj);
+                    localStorage.removeItem(stateKey);
                   }
                 }
+                localStorage.removeItem('plantRecorderTrials_v2');
+                localStorage.removeItem('lastActiveTrial');
+                console.log('Migration complete: localStorage -> IndexedDB');
+              } catch (err) {
+                console.error('Migration failed:', err);
+              }
+            }
 
-                // --- App-level storage functions ---
-                async function saveState() {
-                  if (!currentTrial) return;
-                  state.selectedCharacters = selectedCharacters.map(c => c.name);
-                  const record = { internalId: currentTrial.internalId, ...state };
-                  await dbPut('trialStates', record);
-                }
+            // --- App-level storage functions ---
+            async function saveState() {
+              if (!currentTrial) return;
+              state.selectedCharacters = selectedCharacters.map(c => c.name);
+              const record = { internalId: currentTrial.internalId, ...state };
+              await dbPut('trialStates', record);
+              // Keep a lightweight progress counter on the trial itself so
+              // renderTrialButtons() never needs to load all trialState records.
+              await updateCompletedCount(currentTrial, state);
+            }
 
-                async function saveTrials() {
-                  for (const trial of trials) {
-                    await dbPut('trials', trial);
+            // Counts how many genotypes have at least one scored trait value,
+            // writes the integer into trial.completedCount, and saves the trial.
+            // This is cheap — it only iterates the in-memory state.data object.
+            async function updateCompletedCount(trial, currentState) {
+              if (!trial || !currentState?.data) return;
+              const SKIP = new Set(['isFavorite', 'needsReview', 'isMissing', 'remarks', 'photoCount', 'tags']);
+              const count = Object.values(currentState.data).filter(d =>
+                Object.entries(d).some(([k, v]) => !SKIP.has(k) && v !== '' && v !== null && v !== undefined)
+              ).length;
+              if (trial.completedCount !== count) {
+                trial.completedCount = count;
+                await dbPut('trials', trial);
+              }
+            }
+
+            async function saveTrials() {
+              for (const trial of trials) {
+                await dbPut('trials', trial);
+              }
+            }
+
+            async function deleteTrial(internalId) {
+              trials = trials.filter(t => t.internalId !== internalId);
+              await dbDelete('trials', internalId);
+              await dbDelete('trialStates', internalId);
+            }
+
+            async function loadTrials() {
+              trials = await dbGetAll('trials');
+              renderTrialButtons();
+            }
+
+            function loadTrial(internalId) {
+              currentTrial = trials.find(t => t.internalId === internalId);
+              if (currentTrial) {
+                selectedCharacters = [];
+                dom.charSelectTrialName.textContent = getTrialFullName(currentTrial);
+                renderCharacterSelection();
+                updateView('character');
+              } else {
+                console.error("Could not find trial with ID:", internalId);
+                updateView('trial');
+              }
+            }
+
+            async function startDataEntry() {
+              const savedRecord = await dbGet('trialStates', currentTrial.internalId);
+              state = savedRecord ? savedRecord : setDefaultState(currentTrial);
+
+              // currentIndex is preserved from savedRecord so the user resumes where they left off.
+              // Only reset to 0 for a brand new trial (setDefaultState already sets it to 0).
+
+              const trialChars = currentTrial.characters.map(c => c.name);
+              Object.keys(state.data).forEach(genoName => {
+                trialChars.forEach(charName => {
+                  if (!(charName in state.data[genoName])) {
+                    state.data[genoName][charName] = "";
                   }
+                });
+              });
+
+              updateView("entry");
+              renderCurrentForm();
+            }
+
+            function setDefaultState(trial) {
+              if (!trial) return {};
+              const newState = {
+                data: {},
+                currentIndex: 0,
+              };
+              trial.genotypes.forEach((genoObj) => {
+                newState.data[genoObj.name] = {
+                  isFavorite: false,
+                  needsReview: false,
+                  isMissing: false,
+                  remarks: "",
+                  photoCount: 0,
+                  tags: [],
+                  ...trial.characters.reduce(
+                    (acc, char) => ({ ...acc, [char.name]: "" }), {}
+                  ),
+                };
+              });
+              return newState;
+            }
+
+            async function renderTrialButtons() {
+              const fragment = document.createDocumentFragment();
+              dom.trialButtonsContainer.innerHTML = '';
+
+              if (!trials || trials.length === 0) {
+                dom.trialButtonsContainer.innerHTML =
+                  '<p style="grid-column: 1 / -1; text-align: center">No trials found. Click Add New Trial or Import to get started.</p>';
+                return;
+              }
+
+              const seasonOrder = { SPRING: 1, SUMMER: 2, AUTUMN: 3, FALL: 3, WINTER: 4 };
+
+              trials.sort((a, b) => {
+                // Newest year first
+                if (b.year !== a.year) return b.year - a.year;
+
+                // Then by season order
+                const seasonA = seasonOrder[a.season?.toUpperCase()] ?? 99;
+                const seasonB = seasonOrder[b.season?.toUpperCase()] ?? 99;
+                return seasonA - seasonB;
+              });
+
+              // Progress is read from trial.completedCount (a cached integer) so we
+              // don't need to load every trialState record just to render the menu.
+              // completedCount is kept up-to-date by updateCompletedCount() on every save.
+
+              let currentYear = null;
+              let currentSeason = null;
+              let seasonContainer = null;
+
+              trials.forEach(trial => {
+                if (trial.year !== currentYear) {
+                  currentYear = trial.year;
+                  currentSeason = null;
+
+                  const yearHeader = document.createElement('h2');
+                  yearHeader.className = 'year-header';
+                  yearHeader.textContent = currentYear;
+                  fragment.appendChild(yearHeader);
                 }
 
-                async function deleteTrial(internalId) {
-                  trials = trials.filter(t => t.internalId !== internalId);
-                  await dbDelete('trials', internalId);
-                  await dbDelete('trialStates', internalId);
+                if (trial.season !== currentSeason) {
+                  currentSeason = trial.season;
+
+                  const seasonHeader = document.createElement('h3');
+                  seasonHeader.className = 'season-header';
+                  seasonHeader.textContent = currentSeason;
+                  fragment.appendChild(seasonHeader);
+
+                  seasonContainer = document.createElement('div');
+                  seasonContainer.className = 'season-grid';
+                  fragment.appendChild(seasonContainer);
                 }
 
-                async function loadTrials() {
-                  trials = await dbGetAll('trials');
-                  renderTrialButtons();
-                }
-
-                function loadTrial(internalId) {
-                  currentTrial = trials.find(t => t.internalId === internalId);
-                  if (currentTrial) {
-                    selectedCharacters = [];
-                    dom.charSelectTrialName.textContent = getTrialFullName(currentTrial);
-                    renderCharacterSelection();
-                    updateView('character');
-                  } else {
-                    console.error("Could not find trial with ID:", internalId);
-                    updateView('trial');
-                  }
-                }
-
-                async function startDataEntry() {
-                  const savedRecord = await dbGet('trialStates', currentTrial.internalId);
-                  state = savedRecord ? savedRecord : setDefaultState(currentTrial);
-
-                  // currentIndex is preserved from savedRecord so the user resumes where they left off.
-                  // Only reset to 0 for a brand new trial (setDefaultState already sets it to 0).
-
-                  const trialChars = currentTrial.characters.map(c => c.name);
-                  Object.keys(state.data).forEach(genoName => {
-                    trialChars.forEach(charName => {
-                      if (!(charName in state.data[genoName])) {
-                        state.data[genoName][charName] = "";
-                      }
-                    });
-                  });
-
-                  updateView("entry");
-                  renderCurrentForm();
-                }
-
-                function setDefaultState(trial) {
-                  if (!trial) return {};
-                  const newState = {
-                    data: {},
-                    currentIndex: 0,
-                  };
-                  trial.genotypes.forEach((genoObj) => {
-                    newState.data[genoObj.name] = {
-                      isFavorite: false,
-                      needsReview: false,
-                      isMissing: false,
-                      remarks: "",
-                      photoCount: 0,
-                      tags: [],
-                      ...trial.characters.reduce(
-                        (acc, char) => ({ ...acc, [char.name]: "" }), {}
-                      ),
-                    };
-                  });
-                  return newState;
-                }
-
-                async function renderTrialButtons() {
-                  const fragment = document.createDocumentFragment();
-                  dom.trialButtonsContainer.innerHTML = '';
-
-                  if (!trials || trials.length === 0) {
-                    dom.trialButtonsContainer.innerHTML =
-                      '<p style="grid-column: 1 / -1; text-align: center">No trials found. Click Add New Trial or Import to get started.</p>';
-                    return;
-                  }
-
-                  const seasonOrder = { SPRING: 1, SUMMER: 2, AUTUMN: 3, FALL: 3, WINTER: 4 };
-
-                  trials.sort((a, b) => {
-                    // Newest year first
-                    if (b.year !== a.year) return b.year - a.year;
-
-                    // Then by season order
-                    const seasonA = seasonOrder[a.season?.toUpperCase()] ?? 99;
-                    const seasonB = seasonOrder[b.season?.toUpperCase()] ?? 99;
-                    return seasonA - seasonB;
-                  });
-
-                  // Pre-fetch all trial states from IndexedDB in one go
-                  const allStates = await dbGetAll('trialStates');
-                  const stateMap = {};
-                  allStates.forEach(s => { stateMap[s.internalId] = s; });
-
-                  let currentYear = null;
-                  let currentSeason = null;
-                  let seasonContainer = null;
-
-                  trials.forEach(trial => {
-                    if (trial.year !== currentYear) {
-                      currentYear = trial.year;
-                      currentSeason = null;
-
-                      const yearHeader = document.createElement('h2');
-                      yearHeader.className = 'year-header';
-                      yearHeader.textContent = currentYear;
-                      fragment.appendChild(yearHeader);
-                    }
-
-                    if (trial.season !== currentSeason) {
-                      currentSeason = trial.season;
-
-                      const seasonHeader = document.createElement('h3');
-                      seasonHeader.className = 'season-header';
-                      seasonHeader.textContent = currentSeason;
-                      fragment.appendChild(seasonHeader);
-
-                      seasonContainer = document.createElement('div');
-                      seasonContainer.className = 'season-grid';
-                      fragment.appendChild(seasonContainer);
-                    }
-
-                    const buttonContainer = document.createElement('div');
-                    buttonContainer.className = 'trial-button';
-                    const _sd = stateMap[trial.internalId];
-                    let _prog = 'Not started';
-                    if (_sd) {
-                      try {
-                        const _t = trial.genotypes.length;
-                        const _s = Object.values(_sd.data || {}).filter(d =>
-                          Object.entries(d).some(([k, v]) => !['isFavorite', 'needsReview', 'isMissing', 'remarks', 'photoCount', 'tags'].includes(k) && v !== '' && v !== null && v !== undefined)
-                        ).length;
-                        _prog = `${_t > 0 ? Math.round((_s / _t) * 100) : 0}% scored (${_s}/${_t})`;
-                      } catch (e) { _prog = 'Resume'; }
-                    }
-                    buttonContainer.innerHTML = `
-                                  <div class="trial-button-content">
-                                      <div>
-                                          <p class="font-bold text-primary">${trial.trialId} - ${trial.name}</p>
-                                          <p style="font-size: 0.9rem; opacity: 0.7">${trial.year} - ${trial.season}</p>
-                                           <p style="font-size:0.7rem;margin-top:0.25rem;color:var(--accent-color)">${_prog}</p>
-                                      </div>
-                                      <div class="trial-button-actions">
-                                          <button data-action="edit" data-id="${trial.internalId}" title="Edit Trial" class="btn btn-ghost btn-xs">✏️</button>
-                                          <button data-action="delete" data-id="${trial.internalId}" title="Delete Trial" class="btn btn-ghost btn-xs">️🗑️</button>
-                                      </div>
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'trial-button';
+                const _t = trial.genotypes.length;
+                const _s = trial.completedCount ?? null;
+                let _prog = _s === null ? 'Not started' : `${_t > 0 ? Math.round((_s / _t) * 100) : 0}% scored (${_s}/${_t})`;
+                buttonContainer.innerHTML = `
+                              <div class="trial-button-content">
+                                  <div>
+                                      <p class="font-bold text-primary">${trial.trialId} - ${trial.name}</p>
+                                      <p style="font-size: 0.9rem; opacity: 0.7">${trial.year} - ${trial.season}</p>
+                                       <p style="font-size:0.7rem;margin-top:0.25rem;color:var(--accent-color)">${_prog}</p>
                                   </div>
-                              `;
+                                  <div class="trial-button-actions">
+                                      <button data-action="edit" data-id="${trial.internalId}" title="Edit Trial" class="btn btn-ghost btn-xs">✏️</button>
+                                      <button data-action="delete" data-id="${trial.internalId}" title="Delete Trial" class="btn btn-ghost btn-xs">️🗑️</button>
+                                  </div>
+                              </div>
+                          `;
 
-                    buttonContainer.addEventListener('click', (e) => {
-                      if (!e.target.closest('button')) {
-                        loadTrial(trial.internalId);
+                buttonContainer.addEventListener('click', (e) => {
+                  if (!e.target.closest('button')) {
+                    loadTrial(trial.internalId);
+                  }
+                });
+
+                if (seasonContainer) {
+                  seasonContainer.appendChild(buttonContainer);
+                }
+              });
+
+              dom.trialButtonsContainer.appendChild(fragment);
+            }
+
+            function renderCharacterSelection() {
+              const trial = currentTrial;
+              dom.characterSelectionContainer.innerHTML = "";
+
+              trial.characters.forEach(char => {
+                const isChecked = selectedCharacters.some(sc => sc.name === char.name);
+                const mergedIndicator = char.isMerged ? '<span class="merged-indicator" title="Merged">M</span>' : '';
+
+                const checkboxDiv = document.createElement('div');
+                checkboxDiv.innerHTML = `
+                            <label>
+                                <input type="checkbox" data-char-name="${char.name}" class="checkbox" ${isChecked ? 'checked' : ''}>
+                                <span class="font-bold">${char.name}${mergedIndicator}</span>
+                                <span style="font-size: 0.75rem; opacity: 0.7;">${char.type}</span>
+                            </label>
+                        `;
+                dom.characterSelectionContainer.appendChild(checkboxDiv);
+              });
+
+              // Remove this line: selectedCharacters = [];
+              dom.startRecordingBtn.disabled = selectedCharacters.length === 0;
+            }
+
+
+            function renderCurrentForm() {
+              if (!currentTrial || !currentTrial.genotypes || currentTrial.genotypes.length === 0) {
+                showModalAlert("Error", "Could not render form, data is missing.", () => dom.alertModal.classList.add('hidden'));
+                updateView("trial");
+                return;
+              }
+
+              if (!state.data) state = setDefaultState(currentTrial);
+
+              const genotypeObj = currentTrial.genotypes[state.currentIndex];
+              if (!genotypeObj) return;
+
+              const genotypeName = genotypeObj.name;
+              const genotypeData = state.data[genotypeName];
+              if (!genotypeData) return;
+
+              const mergedIndicator = genotypeObj.isMerged ? `<span class="merged-indicator" title="Merged">M</span>` : '';
+              dom.genotypeTitle.innerHTML = `Genotype: ${genotypeName}${mergedIndicator}`;
+
+              dom.entryForm.innerHTML = "";
+
+              const photoCountBadge = genotypeData.photoCount > 0
+                ? `<span style="font-weight: 600; background-color: var(--accent-color); color: var(--primary-content); padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.8rem; margin-left: -0.5rem; user-select: none;">${genotypeData.photoCount}</span>`
+                : '';
+
+              dom.actionsContainer.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <button data-action="camera" title="Take Photo" class="action-button active" style="font-size: 1.5rem;">📷</button>
+                            ${photoCountBadge}
+                        </div>
+                        <button data-action="favorite" title="Mark as Favorite" class="action-button ${genotypeData.isFavorite ? "active" : ""}" style="font-size: 1.5rem;">⭐</button>
+                        <button data-action="review" title="Flag for Review" class="action-button ${genotypeData.needsReview ? "active" : ""}" style="font-size: 1.5rem;">🚩</button>
+                        <button data-action="missing" title="Mark as Missing" class="action-button ${genotypeData.isMissing ? "active" : ""}" style="font-size: 1.5rem;">❌</button>
+      `                   ;
+
+              // DAP badge
+              const entryFormContainer = dom.entryForm.closest('.entry-form-container');
+              const oldDap = entryFormContainer.querySelector('.dap-badge');
+              if (oldDap) oldDap.remove();
+              if (currentTrial.plantingDate) {
+                const planted = new Date(currentTrial.plantingDate);
+                const dap = Math.floor((new Date() - planted) / (1000 * 60 * 60 * 24));
+                const badge = document.createElement('p');
+                badge.className = 'dap-badge';
+                badge.textContent = `📅 DAP: ${dap} days since ${currentTrial.plantingDate}`;
+                entryFormContainer.insertBefore(badge, dom.entryForm);
+              }
+
+              const formFragment = document.createDocumentFragment();
+              selectedCharacters.forEach((char) => {
+                const value = genotypeData[char.name] || "";
+                const wrapper = document.createElement("div");
+                let inputHTML = '';
+                if (char.type === 'num') {
+                  const minAttr = (char.min !== null && char.min !== undefined) ? `min="${char.min}"` : '';
+                  const maxAttr = (char.max !== null && char.max !== undefined) ? `max="${char.max}"` : '';
+                  const hasRange = char.min !== null && char.min !== undefined && char.max !== null && char.max !== undefined;
+                  const rangeHint = hasRange ? `<span class="range-hint" data-range-for="${char.name}">⚠️ Must be ${char.min} – ${char.max}</span>` : '';
+                  inputHTML = `<input type="number" inputmode="decimal" step="any" value="${value}" ${minAttr} ${maxAttr} data-char-name="${char.name}" class="input">${rangeHint}`;
+
+                } else if (char.type === 'cat') {
+                  const opts = (char.options || []).map(o => `<option value="${o}" ${o === value ? 'selected' : ''}>${o}</option>`).join('');
+                  inputHTML = `<select data-char-name="${char.name}" class="select"><option value="">-- Select --</option>${opts}</select>`;
+                } else {
+                  inputHTML = `<input type="text" value="${value}" data-char-name="${char.name}" class="input">`;
+                }
+                const charMergedIndicator = char.isMerged ? `<span class="merged-indicator" title="Merged">M</span>` : '';
+                wrapper.innerHTML = `<label class="label">${char.name}${charMergedIndicator}</label>${inputHTML}`;
+                formFragment.appendChild(wrapper);
+              });
+              dom.entryForm.appendChild(formFragment); // single reflow
+
+              //  dom.remarksInput.value = genotypeData.remarks || "";            // Tags row
+              const oldTagContainer = entryFormContainer.querySelector('.tag-container');
+              if (oldTagContainer) oldTagContainer.remove();
+              const trialTags = currentTrial.tags || [];
+              if (trialTags.length > 0) {
+                const tagContainer = document.createElement('div');
+                tagContainer.className = 'tag-container';
+                trialTags.forEach(tag => {
+                  const isActive = (genotypeData.tags || []).includes(tag);
+                  const btn = document.createElement('button');
+                  btn.className = `tag-btn ${isActive ? 'active' : ''}`;
+                  btn.textContent = tag;
+                  btn.dataset.action = 'tag';
+                  btn.dataset.tag = tag;
+                  tagContainer.appendChild(btn);
+                });
+                entryFormContainer.appendChild(tagContainer);
+              }
+
+              dom.remarksInput.value = genotypeData.remarks || "";
+              dom.remarksWrapper.classList.add("hidden");
+              dom.toggleRemarksBtn.textContent = "Show";
+
+              updateNavigation();
+              updateProgressBar();
+
+              const firstInput = dom.entryForm.querySelector('input');
+              if (firstInput) {
+                firstInput.focus();
+                firstInput.select();
+              }
+            }
+
+            function updateNavigation() {
+              if (!currentTrial || !currentTrial.genotypes) return;
+              const total = currentTrial.genotypes.length;
+              dom.fixedPrevBtn.disabled = state.currentIndex === 0;
+              dom.fixedNextBtn.disabled = state.currentIndex === total - 1;
+            }
+
+            function updateProgressBar() {
+              if (!currentTrial || !currentTrial.genotypes) return;
+              const total = currentTrial.genotypes.length;
+              const percent = total > 0 ? ((state.currentIndex + 1) / total) * 100 : 0;
+              dom.progressBar.style.width = `${percent}%`;
+              dom.progressText.textContent = `${state.currentIndex + 1} / ${total}`;
+            }
+
+            function collectFormData() {
+              if (!currentTrial || !state.data) return;
+              const genotypeName = currentTrial.genotypes[state.currentIndex]?.name;
+              if (!genotypeName) return;
+
+              // Collect all character inputs
+              dom.entryForm.querySelectorAll('[data-char-name]').forEach((input) => {
+                state.data[genotypeName][input.dataset.charName] = input.value;
+              });
+
+              // Collect remarks
+              state.data[genotypeName].remarks = dom.remarksInput.value;
+            }
+
+
+            function next() {
+              collectFormData();
+              // Check for any out-of-range inputs
+              const outOfRangeFields = [...dom.entryForm.querySelectorAll('.input.out-of-range')];
+              if (outOfRangeFields.length > 0) {
+                const names = outOfRangeFields.map(i => i.dataset.charName).join(', ');
+                showConfirmationPrompt(
+                  '⚠️ Out of Range',
+                  `<p>The following fields have values outside the specified range:</p><p style="font-weight:600;margin-top:0.5rem">${names}</p><p>Do you still want to proceed?</p>`,
+                  () => {
+                    if (state.currentIndex < currentTrial.genotypes.length - 1) {
+                      state.currentIndex++;
+                      if (vibrateNext > 0) {
+                        if (window.Android?.vibrate) window.Android.vibrate(vibrateNext);
+                        else navigator.vibrate?.(vibrateNext);
                       }
-                    });
-
-                    if (seasonContainer) {
-                      seasonContainer.appendChild(buttonContainer);
-                    }
-                  });
-
-                  dom.trialButtonsContainer.appendChild(fragment);
-                }
-
-                function renderCharacterSelection() {
-                  const trial = currentTrial;
-                  dom.characterSelectionContainer.innerHTML = "";
-
-                  trial.characters.forEach(char => {
-                    const isChecked = selectedCharacters.some(sc => sc.name === char.name);
-                    const mergedIndicator = char.isMerged ? '<span class="merged-indicator" title="Merged">M</span>' : '';
-
-                    const checkboxDiv = document.createElement('div');
-                    checkboxDiv.innerHTML = `
-                                <label>
-                                    <input type="checkbox" data-char-name="${char.name}" class="checkbox" ${isChecked ? 'checked' : ''}>
-                                    <span class="font-bold">${char.name}${mergedIndicator}</span>
-                                    <span style="font-size: 0.75rem; opacity: 0.7;">${char.type}</span>
-                                </label>
-                            `;
-                    dom.characterSelectionContainer.appendChild(checkboxDiv);
-                  });
-
-                  // Remove this line: selectedCharacters = [];
-                  dom.startRecordingBtn.disabled = selectedCharacters.length === 0;
-                }
-
-
-                function renderCurrentForm() {
-                  if (!currentTrial || !currentTrial.genotypes || currentTrial.genotypes.length === 0) {
-                    showModalAlert("Error", "Could not render form, data is missing.", () => dom.alertModal.classList.add('hidden'));
-                    updateView("trial");
-                    return;
-                  }
-
-                  if (!state.data) state = setDefaultState(currentTrial);
-
-                  const genotypeObj = currentTrial.genotypes[state.currentIndex];
-                  if (!genotypeObj) return;
-
-                  const genotypeName = genotypeObj.name;
-                  const genotypeData = state.data[genotypeName];
-                  if (!genotypeData) return;
-
-                  const mergedIndicator = genotypeObj.isMerged ? `<span class="merged-indicator" title="Merged">M</span>` : '';
-                  dom.genotypeTitle.innerHTML = `Genotype: ${genotypeName}${mergedIndicator}`;
-
-                  dom.entryForm.innerHTML = "";
-
-                  const photoCountBadge = genotypeData.photoCount > 0
-                    ? `<span style="font-weight: 600; background-color: var(--accent-color); color: var(--primary-content); padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.8rem; margin-left: -0.5rem; user-select: none;">${genotypeData.photoCount}</span>`
-                    : '';
-
-                  dom.actionsContainer.innerHTML = `
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <button data-action="camera" title="Take Photo" class="action-button active" style="font-size: 1.5rem;">📷</button>
-                                ${photoCountBadge}
-                            </div>
-                            <button data-action="favorite" title="Mark as Favorite" class="action-button ${genotypeData.isFavorite ? "active" : ""}" style="font-size: 1.5rem;">⭐</button>
-                            <button data-action="review" title="Flag for Review" class="action-button ${genotypeData.needsReview ? "active" : ""}" style="font-size: 1.5rem;">🚩</button>
-                            <button data-action="missing" title="Mark as Missing" class="action-button ${genotypeData.isMissing ? "active" : ""}" style="font-size: 1.5rem;">❌</button>
-          `                   ;
-
-                  // DAP badge
-                  const entryFormContainer = dom.entryForm.closest('.entry-form-container');
-                  const oldDap = entryFormContainer.querySelector('.dap-badge');
-                  if (oldDap) oldDap.remove();
-                  if (currentTrial.plantingDate) {
-                    const planted = new Date(currentTrial.plantingDate);
-                    const dap = Math.floor((new Date() - planted) / (1000 * 60 * 60 * 24));
-                    const badge = document.createElement('p');
-                    badge.className = 'dap-badge';
-                    badge.textContent = `📅 DAP: ${dap} days since ${currentTrial.plantingDate}`;
-                    entryFormContainer.insertBefore(badge, dom.entryForm);
-                  }
-
-                  selectedCharacters.forEach((char) => {
-                    const value = genotypeData[char.name] || "";
-                    const wrapper = document.createElement("div");
-                    let inputHTML = '';
-                    if (char.type === 'num') {
-                      const minAttr = (char.min !== null && char.min !== undefined) ? `min="${char.min}"` : '';
-                      const maxAttr = (char.max !== null && char.max !== undefined) ? `max="${char.max}"` : '';
-                      const hasRange = char.min !== null && char.min !== undefined && char.max !== null && char.max !== undefined;
-                      const rangeHint = hasRange ? `<span class="range-hint" data-range-for="${char.name}">⚠️ Must be ${char.min} – ${char.max}</span>` : '';
-                      inputHTML = `<input type="number" inputmode="decimal" step="any" value="${value}" ${minAttr} ${maxAttr} data-char-name="${char.name}" class="input">${rangeHint}`;
-
-                    } else if (char.type === 'cat') {
-                      const opts = (char.options || []).map(o => `<option value="${o}" ${o === value ? 'selected' : ''}>${o}</option>`).join('');
-                      inputHTML = `<select data-char-name="${char.name}" class="select"><option value="">-- Select --</option>${opts}</select>`;
+                      renderCurrentForm();
                     } else {
-                      inputHTML = `<input type="text" value="${value}" data-char-name="${char.name}" class="input">`;
+                      prepareExportScreen();
                     }
-                    const charMergedIndicator = char.isMerged ? `<span class="merged-indicator" title="Merged">M</span>` : '';
-                    wrapper.innerHTML = `<label class="label">${char.name}${charMergedIndicator}</label>${inputHTML}`;
-                    dom.entryForm.appendChild(wrapper);
-                  });
-
-                  //  dom.remarksInput.value = genotypeData.remarks || "";            // Tags row
-                  const oldTagContainer = entryFormContainer.querySelector('.tag-container');
-                  if (oldTagContainer) oldTagContainer.remove();
-                  const trialTags = currentTrial.tags || [];
-                  if (trialTags.length > 0) {
-                    const tagContainer = document.createElement('div');
-                    tagContainer.className = 'tag-container';
-                    trialTags.forEach(tag => {
-                      const isActive = (genotypeData.tags || []).includes(tag);
-                      const btn = document.createElement('button');
-                      btn.className = `tag-btn ${isActive ? 'active' : ''}`;
-                      btn.textContent = tag;
-                      btn.dataset.action = 'tag';
-                      btn.dataset.tag = tag;
-                      tagContainer.appendChild(btn);
-                    });
-                    entryFormContainer.appendChild(tagContainer);
-                  }
-
-                  dom.remarksInput.value = genotypeData.remarks || "";
-                  dom.remarksWrapper.classList.add("hidden");
-                  dom.toggleRemarksBtn.textContent = "Show";
-
-                  updateNavigation();
-                  updateProgressBar();
-
-                  const firstInput = dom.entryForm.querySelector('input');
-                  if (firstInput) {
-                    firstInput.focus();
-                    firstInput.select();
-                  }
-                }
-
-                function updateNavigation() {
-                  if (!currentTrial || !currentTrial.genotypes) return;
-                  const total = currentTrial.genotypes.length;
-                  dom.fixedPrevBtn.disabled = state.currentIndex === 0;
-                  dom.fixedNextBtn.disabled = state.currentIndex === total - 1;
-                }
-
-                function updateProgressBar() {
-                  if (!currentTrial || !currentTrial.genotypes) return;
-                  const total = currentTrial.genotypes.length;
-                  const percent = total > 0 ? ((state.currentIndex + 1) / total) * 100 : 0;
-                  dom.progressBar.style.width = `${percent}%`;
-                  dom.progressText.textContent = `${state.currentIndex + 1} / ${total}`;
-                }
-
-                function collectFormData() {
-                  if (!currentTrial || !state.data) return;
-                  const genotypeName = currentTrial.genotypes[state.currentIndex]?.name;
-                  if (!genotypeName) return;
-
-                  // Collect all character inputs
-                  dom.entryForm.querySelectorAll('[data-char-name]').forEach((input) => {
-                    state.data[genotypeName][input.dataset.charName] = input.value;
-                  });
-
-                  // Collect remarks
-                  state.data[genotypeName].remarks = dom.remarksInput.value;
-                }
-
-
-                function next() {
-                  collectFormData();
-                  // Check for any out-of-range inputs
-                  const outOfRangeFields = [...dom.entryForm.querySelectorAll('.input.out-of-range')];
-                  if (outOfRangeFields.length > 0) {
-                    const names = outOfRangeFields.map(i => i.dataset.charName).join(', ');
-                    showConfirmationPrompt(
-                      '⚠️ Out of Range',
-                      `<p>The following fields have values outside the specified range:</p><p style="font-weight:600;margin-top:0.5rem">${names}</p><p>Do you still want to proceed?</p>`,
-                      () => {
-                        if (state.currentIndex < currentTrial.genotypes.length - 1) {
-                          state.currentIndex++;
-                          if (vibrateNext > 0) navigator.vibrate?.(vibrateNext);
-                          renderCurrentForm();
-                        } else {
-                          prepareExportScreen();
-                        }
-                        saveState();
-                      },
-                      null,
-                      'Proceed Anyway',
-                      'Go Back'
-                    );
-                    return;
-                  }
-                  if (state.currentIndex < currentTrial.genotypes.length - 1) {
-                    state.currentIndex++;
-                    if (vibrateNext > 0) navigator.vibrate?.(vibrateNext);
-                    renderCurrentForm();
                     saveState();
-                  } else {
-                    prepareExportScreen();
-                    saveState();
+                  },
+                  null,
+                  'Proceed Anyway',
+                  'Go Back'
+                );
+                return;
+              }
+              if (state.currentIndex < currentTrial.genotypes.length - 1) {
+                state.currentIndex++;
+                if (vibrateNext > 0) {
+                  if (window.Android?.vibrate) window.Android.vibrate(vibrateNext);
+                  else navigator.vibrate?.(vibrateNext);
+                }
+                renderCurrentForm();
+                saveState();
+              } else {
+                prepareExportScreen();
+                saveState();
+              }
+            }
+
+
+            function prev() {
+              collectFormData();
+              if (state.currentIndex > 0) {
+                state.currentIndex--;
+                if (vibratePrev > 0) {
+                  if (window.Android?.vibrate) window.Android.vibrate(vibratePrev);
+                  else navigator.vibrate?.(vibratePrev);
+                }
+                renderCurrentForm();
+                saveState();
+              }
+            }
+
+            function prepareExportScreen() {
+              if (!currentTrial) return;
+
+              if (selectedCharacters.length === 0) {
+                const message = '<p class="text-center" style="padding: 1rem;">No characters were selected for this session. Go back to the data entry screen to see data.</p>';
+                dom.reviewSection.classList.add("hidden");
+                dom.reviewTableContainer.innerHTML = '';
+                dom.resultsTableContainer.innerHTML = message;
+                applyReviewView();
+                updateView("export");
+                return;
+              }
+
+              const selectedCharacterNames = selectedCharacters.map(c => c.name);
+              const headers = ["Genotype", ...selectedCharacterNames, "isFavorite", "needsReview", "isMissing", "tags", "remarks"];
+              const reviewItems = currentTrial.genotypes.filter((genoObj) => state.data[genoObj.name]?.needsReview);
+
+              dom.reviewSection.classList.toggle("hidden", reviewItems.length === 0);
+              if (reviewItems.length > 0) {
+                dom.reviewTableContainer.innerHTML = createTableHTML(headers, reviewItems);
+              } else {
+                dom.reviewTableContainer.innerHTML = '<p class="text-center" style="padding: 1rem;">No items were flagged for review.</p>';
+              }
+              dom.resultsTableContainer.innerHTML = createTableHTML(headers, currentTrial.genotypes);
+              updateView("export");
+            }
+            function createTableHTML(headers, genotypeObjList) {
+              const headerHTML = `<thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>`;
+              const bodyHTML = `<tbody>${genotypeObjList.map((genoObj) => {
+                const genoName = genoObj.name;
+                const d = state.data[genoName];
+                if (!d) return '';
+                const genoIndex = currentTrial.genotypes.findIndex(g => g.name === genoName);
+
+                // *** MODIFICATION IS HERE ***
+                const rowData = headers.map(header => {
+                  let cellContent = '';
+                  switch (header) {
+                    case 'Genotype':
+                      cellContent = genoName + (genoObj.isMerged ? ' <span class="merged-indicator" title="Merged">M</span>' : '');
+                      break;
+                    case 'Favorite':
+                      cellContent = d.isFavorite ? "✔️" : "";
+                      break;
+                    case 'Review':
+                      cellContent = d.needsReview ? "❗" : "";
+                      break;
+                    case 'Missing':
+                      cellContent = d.isMissing ? '⛔' : '';
+                      break;
+                    case 'Tags':
+                      cellContent = (d.tags && d.tags.length) ? d.tags.join(', ') : '';
+                      break;
+                    case 'Remarks':
+                      cellContent = d.remarks || "";
+                      break;
+                    default:
+                      cellContent = d[header] !== undefined ? (d[header] || "-") : "-";
+                      break;
                   }
+                  // This adds the data-label attribute to each cell
+                  return `<td data-label="${header}">${cellContent}</td>`;
+                });
+
+                return `<tr class="clickable-row" data-genotype-index="${genoIndex}">${rowData.join("")}</tr>`;
+              }).join("")}</tbody>`;
+              return `<table class="table">${headerHTML}${bodyHTML}</table>`;
+            }
+
+            // *** ADD THIS NEW FUNCTION ***
+            function applyReviewView() {
+              const containers = [dom.reviewTableContainer, dom.resultsTableContainer];
+              containers.forEach(container => {
+                if (isCardView) {
+                  container.classList.add('card-view');
+                  container.classList.remove('table-view');
+                } else {
+                  container.classList.remove('card-view');
+                  container.classList.add('table-view');
                 }
+              });
+              dom.viewToggleBtn.textContent = isCardView ? 'Switch to Table View' : 'Switch to Card View';
+              saveSettings();
+            }
 
+            // *** ADD THIS NEW FUNCTION ***
+            function filterGenotypes() {
+              const query = dom.genotypeFilterInput.value.toLowerCase().trim();
+              const rows = document.querySelectorAll("#export-step .clickable-row");
 
-                function prev() {
-                  collectFormData();
-                  if (state.currentIndex > 0) {
-                    state.currentIndex--;
-                    if (vibratePrev > 0) navigator.vibrate?.(vibratePrev);
-                    renderCurrentForm();
-                    saveState();
-                  }
+              rows.forEach(row => {
+                const genotypeName = row.querySelector('td[data-label="Genotype"]').textContent.toLowerCase();
+                if (genotypeName.includes(query)) {
+                  row.style.display = ""; // Show row
+                } else {
+                  row.style.display = "none"; // Hide row
                 }
+              });
+            }
 
-                function prepareExportScreen() {
-                  if (!currentTrial) return;
+            function exportFile(data, fileName, mimeType = 'text/plain;charset=utf-8', trialFolderName = '') {
+              const blob = data instanceof Blob ? data : new Blob([data], { type: mimeType });
 
-                  if (selectedCharacters.length === 0) {
-                    const message = '<p class="text-center" style="padding: 1rem;">No characters were selected for this session. Go back to the data entry screen to see data.</p>';
-                    dom.reviewSection.classList.add("hidden");
-                    // dom.reviewTableContainer.innerHTML = '';
-                    // dom.resultsTableContainer.innerHTML = message;
-                    dom.resultsTableContainer.innerHTML = createTableHTML(headers, currentTrial.genotypes);
-                    applyReviewView();
-                    updateView("export");
-                    return;
-                  }
+              if (window.Android && typeof window.Android.saveFile === 'function') {
+                const reader = new FileReader();
+                reader.readAsDataURL(blob);
+                reader.onload = function () {
+                  const base64data = reader.result.split(',')[1];
+                  window.Android.saveFile(base64data, fileName, mimeType, trialFolderName);
+                };
+              } else {
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName;
+                link.click();
+                URL.revokeObjectURL(link.href);
+              }
+            }
 
-                  const selectedCharacterNames = selectedCharacters.map(c => c.name);
-                  const headers = ["Genotype", ...selectedCharacterNames, "isFavorite", "needsReview", "isMissing", "tags", "remarks"];
-                  const reviewItems = currentTrial.genotypes.filter((genoObj) => state.data[genoObj.name]?.needsReview);
+            function exportCSV() {
+              if (selectedCharacters.length === 0) {
+                showModalAlert("No Characters Selected", "You must select characters during the 'Select Characters' step to export data.", () => dom.alertModal.classList.add('hidden'));
+                return;
+              }
+              const mv = missingValueIndicator; // missing value placeholder
+              const selectedCharacterNames = selectedCharacters.map(c => c.name);
+              const headers = ["Genotype", ...selectedCharacterNames, "Favorite", "Review", "Missing", "Tags", "Remarks"];
+              let csvContent = headers.join(",") + "\r\n";
 
-                  dom.reviewSection.classList.toggle("hidden", reviewItems.length === 0);
-                  if (reviewItems.length > 0) {
-                    dom.reviewTableContainer.innerHTML = createTableHTML(headers, reviewItems);
-                  } else {
-                    dom.reviewTableContainer.innerHTML = '<p class="text-center" style="padding: 1rem;">No items were flagged for review.</p>';
-                  }
-                  dom.resultsTableContainer.innerHTML = createTableHTML(headers, currentTrial.genotypes);
-                  updateView("export");
+              currentTrial.genotypes.forEach((genoObj) => {
+                const d = state.data[genoObj.name];
+                const rowData = [
+                  `"${genoObj.name.replace(/"/g, '""')}"`,
+                  ...selectedCharacterNames.map((charName) => {
+                    const val = d[charName];
+                    const isEmpty = val === '' || val === null || val === undefined;
+                    const char = selectedCharacters.find(c => c.name === charName);
+                    // Only substitute missing value indicator for numeric fields
+                    if (isEmpty && char && char.type === 'num') return mv;
+                    return `"${(val || '').toString().replace(/"/g, '""')}"`;
+                  }),
+                  d.isFavorite ? "Yes" : "",
+                  d.needsReview ? "Yes" : "",
+                  d.isMissing ? "Yes" : "",
+                  `"${(d.tags || []).join(', ')}"`,
+                  `"${(d.remarks || "").replace(/"/g, '""')}"`,
+                ];
+                csvContent += rowData.join(",") + "\r\n";
+              });
+              const date = getFormattedDate();
+              exportFile(csvContent, `${getTrialFullName(currentTrial)}_wide_${date}.csv`, 'text/csv;charset=utf-8', '');
+            }
+
+            // Tidy / long-format CSV export.
+            // Instead of one row per genotype with trait columns, outputs one row
+            // per (Genotype × Trait) pair — easier to load into R (pivot_longer)
+            // or pandas (melt) for ANOVA and variance analysis.
+            function exportTidyCSV() {
+              if (selectedCharacters.length === 0) {
+                showModalAlert("No Characters Selected", "You must select characters during the 'Select Characters' step to export data.", () => dom.alertModal.classList.add('hidden'));
+                return;
+              }
+              const mv = missingValueIndicator;
+              const headers = ["Trial", "Genotype", "Trait", "Type", "Value", "Favorite", "Review", "Missing", "Tags", "Remarks"];
+              let csvContent = headers.join(",") + "\r\n";
+              const trialName = getTrialFullName(currentTrial);
+
+              currentTrial.genotypes.forEach((genoObj) => {
+                const d = state.data[genoObj.name];
+                selectedCharacters.forEach((char) => {
+                  const val = d[char.name];
+                  const isEmpty = val === '' || val === null || val === undefined;
+                  const cellValue = (isEmpty && char.type === 'num')
+                    ? mv
+                    : `"${(val || '').toString().replace(/"/g, '""')}"`;
+                  const row = [
+                    `"${trialName.replace(/"/g, '""')}"`,
+                    `"${genoObj.name.replace(/"/g, '""')}"`,
+                    `"${char.name.replace(/"/g, '""')}"`,
+                    char.type,
+                    cellValue,
+                    d.isFavorite ? "Yes" : "",
+                    d.needsReview ? "Yes" : "",
+                    d.isMissing ? "Yes" : "",
+                    `"${(d.tags || []).join(', ')}"`,
+                    `"${(d.remarks || "").replace(/"/g, '""')}"`,
+                  ];
+                  csvContent += row.join(",") + "\r\n";
+                });
+              });
+              const date = getFormattedDate();
+              exportFile(csvContent, `${getTrialFullName(currentTrial)}_tidy_${date}.csv`, 'text/csv;charset=utf-8', '');
+            }
+
+            function exportJSON() {
+              if (selectedCharacters.length === 0) {
+                showModalAlert("No Characters Selected", "You must select characters during the 'Select Characters' step to export data.", () => dom.alertModal.classList.add('hidden'));
+                return;
+              }
+              const selectedCharacterNames = selectedCharacters.map(c => c.name);
+              const filteredData = {};
+              Object.keys(state.data).forEach(genoName => {
+                filteredData[genoName] = {
+                  isFavorite: state.data[genoName].isFavorite,
+                  needsReview: state.data[genoName].needsReview,
+                  remarks: state.data[genoName].remarks,
+                  photoCount: state.data[genoName].photoCount
+                };
+                selectedCharacterNames.forEach(charName => {
+                  filteredData[genoName][charName] = state.data[genoName][charName];
+                });
+              });
+
+              const exportData = {
+                trialInfo: {
+                  ...currentTrial,
+                  characters: selectedCharacters
+                },
+                sessionData: filteredData
+              }
+              const date = getFormattedDate();
+              const fileContent = JSON.stringify(exportData, null, 2);
+              exportFile(fileContent, `${getTrialFullName(currentTrial)}_${date}.json`, 'application/json;charset=utf-8', '');
+            }
+
+            function parseCharactersInput(input) {
+              const characters = [];
+              const addedNames = new Set();
+              if (!input || !input.trim()) return characters;
+              const pairs = input.split(',').map(p => p.trim()).filter(Boolean);
+              for (const pair of pairs) {
+                const parts = pair.split(':').map(p => p.trim());
+                const name = parts[0].toUpperCase();
+                if (!name || addedNames.has(name)) continue;
+                const type = parts[1] ? parts[1].toLowerCase() : 'text';
+                if (type !== 'num' && type !== 'text' && type !== 'cat') {
+                  showModalAlert('Invalid Character Type', `The character "${name}" has an invalid type "${type}". Please use num, text, or cat.`, () => dom.alertModal.classList.add('hidden'));
+                  return null;
                 }
-                /*
-                          function createTableHTML(headers, genotypeObjList) {
-                              const headerHTML = `<thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>`;
-                              const bodyHTML = `<tbody>${genotypeObjList.map((genoObj) => {
-                                  const genoName = genoObj.name;
-                                  const d = state.data[genoName];
-                                  if (!d) return '';
-                                  const genoIndex = currentTrial.genotypes.findIndex(g => g.name === genoName);
-
-                                  const rowData = headers.map(header => {
-                                      let cellContent = '';
-                                      switch(header) {
-                                          case 'Genotype':
-                                              cellContent = genoName + (genoObj.isMerged ? ' <span class="merged-indicator" title="Merged">M</span>' : '');
-                                              break;
-                                          case 'Favorite':
-                                              cellContent = d.isFavorite ? "✔️ Yes" : "";
-                                              break;
-                                          case 'Review':
-                                              cellContent = d.needsReview ? "❗Yes" : "";
-                                              break;
-                                          case 'Missing':
-                                              cellContent = d.isMissing ? "⛔ Yes" : "";
-                                              break;
-                                          case 'Tags':
-                                              cellContent = (d.tags && d.tags.length) ? d.tags.join(', ') : '';
-                                              break;
-                                          case 'Remarks':
-                                              cellContent = d.remarks || "";
-                                              break;
-                                          default:
-                                              cellContent = d[header] !== undefined ? (d[header] || "-") : "-";
-                                              break;
-                                      }
-                                      return `<td>${cellContent}</td>`;
-                                  });
-
-                                  return `<tr class="clickable-row" data-genotype-index="${genoIndex}">${rowData.join("")}</tr>`;
-                              }).join("")}</tbody>`;
-                              return `<table class="table">${headerHTML}${bodyHTML}</table>`;
-                          }
-                */
-                function createTableHTML(headers, genotypeObjList) {
-                  const headerHTML = `<thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>`;
-                  const bodyHTML = `<tbody>${genotypeObjList.map((genoObj) => {
-                    const genoName = genoObj.name;
-                    const d = state.data[genoName];
-                    if (!d) return '';
-                    const genoIndex = currentTrial.genotypes.findIndex(g => g.name === genoName);
-
-                    // *** MODIFICATION IS HERE ***
-                    const rowData = headers.map(header => {
-                      let cellContent = '';
-                      switch (header) {
-                        case 'Genotype':
-                          cellContent = genoName + (genoObj.isMerged ? ' <span class="merged-indicator" title="Merged">M</span>' : '');
-                          break;
-                        case 'Favorite':
-                          cellContent = d.isFavorite ? "✔️" : "";
-                          break;
-                        case 'Review':
-                          cellContent = d.needsReview ? "❗" : "";
-                          break;
-                        case 'Missing':
-                          cellContent = d.isMissing ? '⛔' : '';
-                          break;
-                        case 'Tags':
-                          cellContent = (d.tags && d.tags.length) ? d.tags.join(', ') : '';
-                          break;
-                        case 'Remarks':
-                          cellContent = d.remarks || "";
-                          break;
-                        default:
-                          cellContent = d[header] !== undefined ? (d[header] || "-") : "-";
-                          break;
-                      }
-                      // This adds the data-label attribute to each cell
-                      return `<td data-label="${header}">${cellContent}</td>`;
-                    });
-
-                    return `<tr class="clickable-row" data-genotype-index="${genoIndex}">${rowData.join("")}</tr>`;
-                  }).join("")}</tbody>`;
-                  return `<table class="table">${headerHTML}${bodyHTML}</table>`;
+                if (type === 'cat' && (!parts[2] || parts[2].trim() === '')) {
+                  showModalAlert('Invalid Format', `The categorical character "${name}" is missing its options. Please format it as NAME:cat:Opt1;Opt2`, () => dom.alertModal.classList.add('hidden'));
+                  return null;
                 }
+                const options = (type === 'cat' && parts[2]) ? parts[2].split(';').map(o => o.trim()).filter(Boolean) : [];
+                const min = (type === 'num' && parts[2] !== undefined && parts[2] !== '') ? parseFloat(parts[2]) : null;
+                const max = (type === 'num' && parts[3] !== undefined && parts[3] !== '') ? parseFloat(parts[3]) : null;
+                addedNames.add(name);
+                characters.push({ name, type, options, min, max, isMerged: false });
+              }
+              return characters;
+            }
 
-                // *** ADD THIS NEW FUNCTION ***
-                function applyReviewView() {
-                  const containers = [dom.reviewTableContainer, dom.resultsTableContainer];
-                  containers.forEach(container => {
-                    if (isCardView) {
-                      container.classList.add('card-view');
-                      container.classList.remove('table-view');
-                    } else {
-                      container.classList.remove('card-view');
-                      container.classList.add('table-view');
-                    }
-                  });
-                  dom.viewToggleBtn.textContent = isCardView ? 'Switch to Table View' : 'Switch to Card View';
-                  saveSettings();
-                }
+            function parseCsvLine(text) {
+              const regex = /(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^,"]*))/g;
+              let a = [];
+              let m;
+              while ((m = regex.exec(text))) {
+                a.push(m[1] ? m[1].replace(/""/g, '"') : m[2]);
+              }
+              return a;
+            }
 
-                // *** ADD THIS NEW FUNCTION ***
-                function filterGenotypes() {
-                  const query = dom.genotypeFilterInput.value.toLowerCase().trim();
-                  const rows = document.querySelectorAll("#export-step .clickable-row");
+            function sanitizeSheetName(name) {
+              return name.replace(/[:\\/?*[\]]/g, "").substring(0, 31);
+            }
 
-                  rows.forEach(row => {
-                    const genotypeName = row.querySelector('td[data-label="Genotype"]').textContent.toLowerCase();
-                    if (genotypeName.includes(query)) {
-                      row.style.display = ""; // Show row
-                    } else {
-                      row.style.display = "none"; // Hide row
-                    }
-                  });
-                }
+            function exportAllToExcel() {
+              if (trials.length === 0) {
+                showModalAlert("No Data", "There are no trials to export.", () => dom.alertModal.classList.add('hidden'));
+                return;
+              }
 
-                function exportFile(data, fileName, mimeType = 'text/plain;charset=utf-8', trialFolderName = '') {
-                  const blob = data instanceof Blob ? data : new Blob([data], { type: mimeType });
+              const proceedWithExport = async () => {
+                let csvContent = "";
 
-                  if (window.Android && typeof window.Android.saveFile === 'function') {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(blob);
-                    reader.onload = function () {
-                      const base64data = reader.result.split(',')[1];
-                      window.Android.saveFile(base64data, fileName, mimeType, trialFolderName);
-                    };
-                  } else {
-                    const link = document.createElement("a");
-                    link.href = URL.createObjectURL(blob);
-                    link.download = fileName;
-                    link.click();
-                    URL.revokeObjectURL(link.href);
-                  }
-                }
+                // Pre-fetch all states from IndexedDB once
+                const allStates = await dbGetAll('trialStates');
+                const stateMap = {};
+                allStates.forEach(s => { stateMap[s.internalId] = s; });
 
-                function exportCSV() {
-                  if (selectedCharacters.length === 0) {
-                    showModalAlert("No Characters Selected", "You must select characters during the 'Select Characters' step to export data.", () => dom.alertModal.classList.add('hidden'));
-                    return;
-                  }
-                  const selectedCharacterNames = selectedCharacters.map(c => c.name);
-                  const headers = ["Genotype", ...selectedCharacterNames, "Favorite", "Review", "Missing", "Tags", "Remarks"];
-                  let csvContent = headers.join(",") + "\r\n";
-
-                  currentTrial.genotypes.forEach((genoObj) => {
-                    const d = state.data[genoObj.name];
-                    const rowData = [
-                      genoObj.name,
-                      ...selectedCharacterNames.map((charName) => `"${d[charName] || ''}"`),
-                      d.isFavorite ? "Yes" : "",
-                      d.needsReview ? "Yes" : "",
-                      d.isMissing ? "Yes" : "",
-                      `"${(d.tags || []).join(', ')}"`,
-                      `"${(d.remarks || "").replace(/"/g, '""')}"`,
-                    ];
-                    csvContent += rowData.join(",") + "\r\n";
-                  });
-                  const date = getFormattedDate();
-                  exportFile(csvContent, `${getTrialFullName(currentTrial)}_${date}.csv`, 'text/csv;charset=utf-8', '');
-                }
-
-                function exportJSON() {
-                  if (selectedCharacters.length === 0) {
-                    showModalAlert("No Characters Selected", "You must select characters during the 'Select Characters' step to export data.", () => dom.alertModal.classList.add('hidden'));
-                    return;
-                  }
-                  const selectedCharacterNames = selectedCharacters.map(c => c.name);
-                  const filteredData = {};
-                  Object.keys(state.data).forEach(genoName => {
-                    filteredData[genoName] = {
-                      isFavorite: state.data[genoName].isFavorite,
-                      needsReview: state.data[genoName].needsReview,
-                      remarks: state.data[genoName].remarks,
-                      photoCount: state.data[genoName].photoCount
-                    };
-                    selectedCharacterNames.forEach(charName => {
-                      filteredData[genoName][charName] = state.data[genoName][charName];
-                    });
-                  });
-
-                  const exportData = {
-                    trialInfo: {
-                      ...currentTrial,
-                      characters: selectedCharacters
-                    },
-                    sessionData: filteredData
-                  }
-                  const date = getFormattedDate();
-                  const fileContent = JSON.stringify(exportData, null, 2);
-                  exportFile(fileContent, `${getTrialFullName(currentTrial)}_${date}.json`, 'application/json;charset=utf-8', '');
-                }
-
-                function parseCharactersInput(input) {
-                  const characters = [];
-                  const addedNames = new Set();
-                  if (!input || !input.trim()) return characters;
-                  const pairs = input.split(',').map(p => p.trim()).filter(Boolean);
-                  for (const pair of pairs) {
-                    const parts = pair.split(':').map(p => p.trim());
-                    const name = parts[0].toUpperCase();
-                    if (!name || addedNames.has(name)) continue;
-                    const type = parts[1] ? parts[1].toLowerCase() : 'text';
-                    if (type !== 'num' && type !== 'text' && type !== 'cat') {
-                      showModalAlert('Invalid Character Type', `The character "${name}" has an invalid type "${type}". Please use num, text, or cat.`, () => dom.alertModal.classList.add('hidden'));
-                      return null;
-                    }
-                    const options = (type === 'cat' && parts[2]) ? parts[2].split(';').map(o => o.trim()).filter(Boolean) : [];
-                    const min = (type === 'num' && parts[2] !== undefined && parts[2] !== '') ? parseFloat(parts[2]) : null;
-                    const max = (type === 'num' && parts[3] !== undefined && parts[3] !== '') ? parseFloat(parts[3]) : null;
-                    addedNames.add(name);
-                    characters.push({ name, type, options, min, max, isMerged: false });
-                  }
-                  return characters;
-                }
-
-                function parseCsvLine(text) {
-                  const regex = /(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^,"]*))/g;
-                  let a = [];
-                  let m;
-                  while ((m = regex.exec(text))) {
-                    a.push(m[1] ? m[1].replace(/""/g, '"') : m[2]);
-                  }
-                  return a;
-                }
-
-                function sanitizeSheetName(name) {
-                  return name.replace(/[:\\/?*[\]]/g, "").substring(0, 31);
-                }
-
-                function exportAllToExcel() {
-                  if (trials.length === 0) {
-                    showModalAlert("No Data", "There are no trials to export.", () => dom.alertModal.classList.add('hidden'));
-                    return;
-                  }
-
-                  const proceedWithExport = async () => {
-                    let csvContent = "";
-
-                    // Pre-fetch all states from IndexedDB once
-                    const allStates = await dbGetAll('trialStates');
-                    const stateMap = {};
-                    allStates.forEach(s => { stateMap[s.internalId] = s; });
-
-                    trials.forEach(trial => {
-                      try {
-                        // Trial metadata
-                        csvContent += `\r\n\r\n# Trial Metadata\r\n`;
-                        csvContent += `Trial ID:,${trial.trialId}\r\n`;
-                        csvContent += `Trial Name:,${trial.name}\r\n`;
-                        csvContent += `Year:,${trial.year}\r\n`;
-                        csvContent += `Season:,${trial.season}\r\n\r\n`;
-
-                        // Headers
-                        const characterNames = trial.characters.map(c => c.name);
-                        const headers = ["Genotype", ...characterNames, "Favorite", "Review", "Missing", "Tags", "Remarks"];
-                        csvContent += headers.join(",") + "\r\n";
-
-                        // Load session data from pre-fetched map
-                        const sessionData = stateMap[trial.internalId] || null;
-
-                        // Rows
-                        trial.genotypes.forEach(genoObj => {
-                          const d = sessionData?.data?.[genoObj.name] || {};
-                          const row = [
-                            `"${genoObj.name.replace(/"/g, '""')}"`,
-                            ...characterNames.map(name => `"${(d[name] || "").toString().replace(/"/g, '""')}"`),
-                            d.isFavorite || false,
-                            d.needsReview || false,
-                            `"${(d.remarks || "").toString().replace(/"/g, '""')}"`
-                          ];
-                          csvContent += row.join(",") + "\r\n";
-                        });
-                      } catch (error) {
-                        console.error(`Failed to process and export trial: ${trial?.name || 'Unknown Trial'}. Skipping.`, error);
-                      }
-                    });
-
-                    try {
-                      const date = getFormattedDate();
-                      const fileName = `All_Trial_Data_${date}.csv`;
-                      const mimeType = 'text/csv;charset=utf-8';
-
-                      exportFile(csvContent, fileName, mimeType);
-                    } catch (error) {
-                      console.error("Failed to write the final CSV file.", error);
-                      showModalAlert("Export Failed", "An error occurred while generating the final CSV file.", () => dom.alertModal.classList.add('hidden'));
-                    }
-                  };
-
-                  if (trials.length > 5) {
-                    showConfirmationPrompt(
-                      "Large Export Warning",
-                      `You are exporting ${trials.length} trials. On some devices this might cause the browser to crash. Do you want to continue?`,
-                      proceedWithExport,
-                      null,
-                      "Yes, Continue",
-                      "Cancel"
-                    );
-                  } else {
-                    proceedWithExport();
-                  }
-                }
-
-                function handleClearAllData() {
-                  showConfirmationPrompt("⚠️ Clear All Data?",
-                    "This is irreversible and will delete ALL trials, recorded data, and settings. Are you absolutely sure?",
-                    async () => {
-                      await dbClear('trials');
-                      await dbClear('trialStates');
-                      localStorage.removeItem('plantRecorderSettings'); // settings stay in localStorage
-
-                      trials = [];
-                      currentTrial = null;
-                      state = {};
-
-                      renderTrialButtons();
-                      updateView('trial');
-                      showModalAlert("Success", "All website data has been cleared.", () => dom.alertModal.classList.add('hidden'));
-                    },
-                    null,
-                    "Yes, Delete Everything",
-                    "Cancel"
-                  );
-                }
-
-                // --- Export entire IndexedDB as a JSON backup file ---
-                async function exportDB() {
+                trials.forEach(trial => {
                   try {
-                    const allTrials      = await dbGetAll('trials');
-                    const allTrialStates = await dbGetAll('trialStates');
+                    // Trial metadata
+                    csvContent += `\r\n\r\n# Trial Metadata\r\n`;
+                    csvContent += `Trial ID:,${trial.trialId}\r\n`;
+                    csvContent += `Trial Name:,${trial.name}\r\n`;
+                    csvContent += `Year:,${trial.year}\r\n`;
+                    csvContent += `Season:,${trial.season}\r\n\r\n`;
 
-                    // Build JSON in chunks instead of one giant JSON.stringify call.
-                    // Each trial and state record is stringified individually so the
-                    // browser never has to hold the entire database as a single string
-                    // in memory — safe even for very large datasets on low-memory devices.
-                    const chunks = [];
-                    chunks.push(`{\n  "version": 1,\n  "exportedAt": "${new Date().toISOString()}",\n  "trials": [\n`);
-                    allTrials.forEach((trial, i) => {
-                      chunks.push('    ' + JSON.stringify(trial));
-                      if (i < allTrials.length - 1) chunks.push(',');
-                      chunks.push('\n');
-                    });
-                    chunks.push(`  ],\n  "trialStates": [\n`);
-                    allTrialStates.forEach((s, i) => {
-                      chunks.push('    ' + JSON.stringify(s));
-                      if (i < allTrialStates.length - 1) chunks.push(',');
-                      chunks.push('\n');
-                    });
-                    chunks.push(`  ]\n}`);
+                    // Headers
+                    const characterNames = trial.characters.map(c => c.name);
+                    const headers = ["Genotype", ...characterNames, "Favorite", "Review", "Missing", "Tags", "Remarks"];
+                    csvContent += headers.join(",") + "\r\n";
 
-                    const blob    = new Blob(chunks, { type: 'application/json;charset=utf-8' });
-                    const url     = URL.createObjectURL(blob);
-                    const date    = getFormattedDate();
-                    const link    = document.createElement('a');
-                    link.href     = url;
-                    link.download = `PlantRecorder_Backup_${date}.json`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                  } catch (err) {
-                    console.error('Export failed:', err);
-                    showModalAlert('Export Failed', `Could not export database.<br><small>${err.message}</small>`, () => dom.alertModal.classList.add('hidden'));
+                    // Load session data from pre-fetched map
+                    const sessionData = stateMap[trial.internalId] || null;
+
+                    // Rows
+                    trial.genotypes.forEach(genoObj => {
+                      const d = sessionData?.data?.[genoObj.name] || {};
+                      const mv = missingValueIndicator;
+                      const row = [
+                        `"${genoObj.name.replace(/"/g, '""')}"`,
+                        ...characterNames.map(name => {
+                          const val = d[name];
+                          const isEmpty = val === '' || val === null || val === undefined;
+                          const char = trial.characters.find(c => c.name === name);
+                          if (isEmpty && char && char.type === 'num') return mv;
+                          return `"${(val || '').toString().replace(/"/g, '""')}"`;
+                        }),
+                        d.isFavorite ? "Yes" : "",
+                        d.needsReview ? "Yes" : "",
+                        d.isMissing ? "Yes" : "",
+                        `"${(d.tags || []).join(', ')}"`,
+                        `"${(d.remarks || "").toString().replace(/"/g, '""')}"`
+                      ];
+                      csvContent += row.join(",") + "\r\n";
+                    });
+                  } catch (error) {
+                    console.error(`Failed to process and export trial: ${trial?.name || 'Unknown Trial'}. Skipping.`, error);
                   }
+                });
+
+                try {
+                  const date = getFormattedDate();
+                  const fileName = `All_Trial_Data_${date}.csv`;
+                  const mimeType = 'text/csv;charset=utf-8';
+
+                  exportFile(csvContent, fileName, mimeType);
+                } catch (error) {
+                  console.error("Failed to write the final CSV file.", error);
+                  showModalAlert("Export Failed", "An error occurred while generating the final CSV file.", () => dom.alertModal.classList.add('hidden'));
+                }
+              };
+
+              if (trials.length > 5) {
+                showConfirmationPrompt(
+                  "Large Export Warning",
+                  `You are exporting ${trials.length} trials. On some devices this might cause the browser to crash. Do you want to continue?`,
+                  proceedWithExport,
+                  null,
+                  "Yes, Continue",
+                  "Cancel"
+                );
+              } else {
+                proceedWithExport();
+              }
+            }
+
+            function handleClearAllData() {
+              showConfirmationPrompt("⚠️ Clear All Data?",
+                "This is irreversible and will delete ALL trials, recorded data, and settings. Are you absolutely sure?",
+                async () => {
+                  await dbClear('trials');
+                  await dbClear('trialStates');
+                  localStorage.removeItem('plantRecorderSettings'); // settings stay in localStorage
+
+                  trials = [];
+                  currentTrial = null;
+                  state = {};
+
+                  renderTrialButtons();
+                  updateView('trial');
+                  showModalAlert("Success", "All website data has been cleared.", () => dom.alertModal.classList.add('hidden'));
+                },
+                null,
+                "Yes, Delete Everything",
+                "Cancel"
+              );
+            }
+
+            // --- Export entire IndexedDB as a JSON backup file ---
+            async function exportDB() {
+              try {
+                const allTrials      = await dbGetAll('trials');
+                const allTrialStates = await dbGetAll('trialStates');
+
+                // Build JSON in chunks instead of one giant JSON.stringify call.
+                // Each trial and state record is stringified individually so the
+                // browser never has to hold the entire database as a single string
+                // in memory — safe even for very large datasets on low-memory devices.
+                const chunks = [];
+                chunks.push(`{\n  "version": 1,\n  "exportedAt": "${new Date().toISOString()}",\n  "trials": [\n`);
+                allTrials.forEach((trial, i) => {
+                  chunks.push('    ' + JSON.stringify(trial));
+                  if (i < allTrials.length - 1) chunks.push(',');
+                  chunks.push('\n');
+                });
+                chunks.push(`  ],\n  "trialStates": [\n`);
+                allTrialStates.forEach((s, i) => {
+                  chunks.push('    ' + JSON.stringify(s));
+                  if (i < allTrialStates.length - 1) chunks.push(',');
+                  chunks.push('\n');
+                });
+                chunks.push(`  ]\n}`);
+
+                const blob    = new Blob(chunks, { type: 'application/json;charset=utf-8' });
+                const url     = URL.createObjectURL(blob);
+                const date    = getFormattedDate();
+                const link    = document.createElement('a');
+                link.href     = url;
+                link.download = `PlantRecorder_Backup_${date}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+              } catch (err) {
+                console.error('Export failed:', err);
+                showModalAlert('Export Failed', `Could not export database.<br><small>${err.message}</small>`, () => dom.alertModal.classList.add('hidden'));
+              }
+            }
+
+            // --- Import a JSON backup file into IndexedDB ---
+            // Asks user whether to merge with existing data or replace it.
+            async function importDB(file) {
+              try {
+                // Warn if file is unexpectedly large (over 50 MB) — wrong file picked?
+                const MAX_BYTES = 50 * 1024 * 1024;
+                if (file.size > MAX_BYTES) {
+                  showModalAlert('File Too Large', `This file is ${(file.size / 1024 / 1024).toFixed(1)} MB. Expected a Plant Recorder backup under 50 MB. Please check you selected the right file.`, () => dom.alertModal.classList.add('hidden'));
+                  return;
                 }
 
-                // --- Import a JSON backup file into IndexedDB ---
-                // Asks user whether to merge with existing data or replace it.
-                async function importDB(file) {
-                  try {
-                    // Warn if file is unexpectedly large (over 50 MB) — wrong file picked?
-                    const MAX_BYTES = 50 * 1024 * 1024;
-                    if (file.size > MAX_BYTES) {
-                      showModalAlert('File Too Large', `This file is ${(file.size / 1024 / 1024).toFixed(1)} MB. Expected a Plant Recorder backup under 50 MB. Please check you selected the right file.`, () => dom.alertModal.classList.add('hidden'));
-                      return;
+                const text   = await file.text();
+                const backup = JSON.parse(text);
+
+                // Basic validation
+                if (!backup.trials || !backup.trialStates || backup.version !== 1) {
+                  showModalAlert('Invalid File', 'This file does not appear to be a valid Plant Recorder backup.', () => dom.alertModal.classList.add('hidden'));
+                  return;
+                }
+
+                const trialCount = backup.trials.length;
+
+                showConfirmationPrompt(
+                  'Import Database',
+                  `Found <strong>${trialCount} trial(s)</strong> in this backup (exported ${backup.exportedAt?.split('T')[0] ?? 'unknown date'}).<br><br>
+                   <strong>Merge</strong> will add the backup data alongside your current data.<br>
+                   <strong>Replace</strong> will delete everything first, then import.`,
+                  async () => {
+                    // Confirm = Merge
+                    for (const trial of backup.trials) {
+                      await dbPut('trials', trial);
                     }
-
-                    const text   = await file.text();
-                    const backup = JSON.parse(text);
-
-                    // Basic validation
-                    if (!backup.trials || !backup.trialStates || backup.version !== 1) {
-                      showModalAlert('Invalid File', 'This file does not appear to be a valid Plant Recorder backup.', () => dom.alertModal.classList.add('hidden'));
-                      return;
+                    for (const s of backup.trialStates) {
+                      await dbPut('trialStates', s);
                     }
-
-                    const trialCount = backup.trials.length;
-
+                    await loadTrials();
+                    showModalAlert('Import Complete', `${trialCount} trial(s) merged successfully.`, () => dom.alertModal.classList.add('hidden'));
+                  },
+                  async () => {
+                    // Cancel = Replace
                     showConfirmationPrompt(
-                      'Import Database',
-                      `Found <strong>${trialCount} trial(s)</strong> in this backup (exported ${backup.exportedAt?.split('T')[0] ?? 'unknown date'}).<br><br>
-                       <strong>Merge</strong> will add the backup data alongside your current data.<br>
-                       <strong>Replace</strong> will delete everything first, then import.`,
+                      '⚠️ Replace All Data?',
+                      'This will delete ALL current data and replace it with the backup. Are you sure?',
                       async () => {
-                        // Confirm = Merge
+                        await dbClear('trials');
+                        await dbClear('trialStates');
                         for (const trial of backup.trials) {
                           await dbPut('trials', trial);
                         }
                         for (const s of backup.trialStates) {
                           await dbPut('trialStates', s);
                         }
+                        trials = [];
+                        currentTrial = null;
+                        state = {};
                         await loadTrials();
-                        showModalAlert('Import Complete', `${trialCount} trial(s) merged successfully.`, () => dom.alertModal.classList.add('hidden'));
+                        showModalAlert('Import Complete', `${trialCount} trial(s) imported (existing data replaced).`, () => dom.alertModal.classList.add('hidden'));
                       },
-                      async () => {
-                        // Cancel = Replace
-                        showConfirmationPrompt(
-                          '⚠️ Replace All Data?',
-                          'This will delete ALL current data and replace it with the backup. Are you sure?',
-                          async () => {
-                            await dbClear('trials');
-                            await dbClear('trialStates');
-                            for (const trial of backup.trials) {
-                              await dbPut('trials', trial);
-                            }
-                            for (const s of backup.trialStates) {
-                              await dbPut('trialStates', s);
-                            }
-                            trials = [];
-                            currentTrial = null;
-                            state = {};
-                            await loadTrials();
-                            showModalAlert('Import Complete', `${trialCount} trial(s) imported (existing data replaced).`, () => dom.alertModal.classList.add('hidden'));
-                          },
-                          null,
-                          'Yes, Replace',
-                          'Cancel'
-                        );
-                      },
-                      'Merge',
-                      'Replace...'
+                      null,
+                      'Yes, Replace',
+                      'Cancel'
                     );
-                  } catch (err) {
-                    console.error('Import failed:', err);
-                    showModalAlert('Import Failed', `Could not read the backup file.<br><small>${err.message}</small>`, () => dom.alertModal.classList.add('hidden'));
-                  }
-                }
+                  },
+                  'Merge',
+                  'Replace...'
+                );
+              } catch (err) {
+                console.error('Import failed:', err);
+                showModalAlert('Import Failed', `Could not read the backup file.<br><small>${err.message}</small>`, () => dom.alertModal.classList.add('hidden'));
+              }
+            }
 
-                async function openCamera() {
-                  if (!window.isSecureContext && !window.Android) {
-                    showModalAlert("Insecure Connection", "Camera access requires a secure (HTTPS) connection.", () => dom.alertModal.classList.add('hidden'));
-                    return;
-                  }
-                  if (!('mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices)) {
-                    showModalAlert("Unsupported Browser", "Camera access is not available in this browser.", () => dom.alertModal.classList.add('hidden'));
-                    return;
-                  }
-                  try {
-                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', focusMode: 'continuous', width: { ideal: 1900 }, height: { ideal: 1900 } } });
-                    dom.cameraVideo.srcObject = cameraStream;
-                    dom.cameraModal.classList.remove('hidden');
-                  } catch (err) {
-                    console.error("Camera error:", err.name, err.message);
-                    let errorMessage = "Could not access the camera.";
-                    if (err.name === "NotAllowedError" || err.name === "SecurityError") {
-                      errorMessage = "Camera permission was denied. Please go to your browser's site settings and grant camera access. You may need to reload the page afterwards.";
-                    } else if (err.name === "NotFoundError") {
-                      errorMessage = "No camera was found on your device.";
+            async function openCamera() {
+              if (!window.isSecureContext && !window.Android) {
+                showModalAlert("Insecure Connection", "Camera access requires a secure (HTTPS) connection.", () => dom.alertModal.classList.add('hidden'));
+                return;
+              }
+              if (!('mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices)) {
+                showModalAlert("Unsupported Browser", "Camera access is not available in this browser.", () => dom.alertModal.classList.add('hidden'));
+                return;
+              }
+              try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', focusMode: 'continuous', width: { ideal: 1900 }, height: { ideal: 1900 } } });
+                dom.cameraVideo.srcObject = cameraStream;
+                dom.cameraModal.classList.remove('hidden');
+              } catch (err) {
+                console.error("Camera error:", err.name, err.message);
+                let errorMessage = "Could not access the camera.";
+                if (err.name === "NotAllowedError" || err.name === "SecurityError") {
+                  errorMessage = "Camera permission was denied. Please go to your browser's site settings and grant camera access. You may need to reload the page afterwards.";
+                } else if (err.name === "NotFoundError") {
+                  errorMessage = "No camera was found on your device.";
+                }
+                showModalAlert("Camera Access Error", errorMessage, () => dom.alertModal.classList.add('hidden'));
+              }
+            }
+
+            function closeCamera() {
+              if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+              }
+              dom.cameraModal.classList.add('hidden');
+            }
+
+            function capturePhoto() {
+              if (!dom.cameraVideo.videoWidth || !dom.cameraVideo.videoHeight) {
+                showModalAlert("Camera Error", "The camera is not ready yet. Please wait a moment and try again.", () => dom.alertModal.classList.add('hidden'));
+                console.error("capturePhoto called before video stream dimensions were available.");
+                return;
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = dom.cameraVideo.videoWidth;
+              canvas.height = dom.cameraVideo.videoHeight;
+              const context = canvas.getContext('2d');
+              context.drawImage(dom.cameraVideo, 0, 0, canvas.width, canvas.height);
+
+              const genotypeName = currentTrial.genotypes[state.currentIndex].name;
+              const genotypeData = state.data[genotypeName];
+
+              genotypeData.photoCount = (genotypeData.photoCount || 0) + 1;
+              const photoNumber = genotypeData.photoCount;
+              saveState();
+
+              renderCurrentForm();
+
+              // Construct the new filename and the folder name from trial details
+              const trialFolderName = getTrialFullName(currentTrial);
+              const fileName = `${currentTrial.trialId}-${currentTrial.season}_${currentTrial.year}-${currentTrial.name}-${genotypeName} (${photoNumber}).jpg`;
+
+              canvas.toBlob(blob => {
+                exportFile(blob, fileName, 'image/jpeg', trialFolderName);
+              }, 'image/jpeg', 1.0);
+
+              closeCamera();
+            }
+
+            dom.addTrialBtn.addEventListener('click', () => {
+              editingTrialInternalId = null;
+              dom.trialModalTitle.textContent = 'Add New Trial';
+              dom.trialIdInput.value = '';
+              dom.trialYearInput.value = '';
+              dom.trialSeasonInput.value = '';
+              dom.trialNameInput.value = '';
+              dom.trialGenotypesInput.value = '';
+              dom.trialCharactersInput.value = '';
+              dom.trialIdInput.disabled = false;
+              dom.trialTagsInput.value = "";
+              dom.trialPlantingDateInput.value = "";
+              dom.trialIdWarning.textContent = '(Cannot be changed later)';
+              dom.trialIdWarning.classList.remove('hidden');
+              dom.trialModal.classList.remove('hidden');
+            });
+
+            dom.trialModalCancelBtn.addEventListener('click', () => {
+              dom.trialModal.classList.add('hidden');
+            });
+
+            dom.trialModalSaveBtn.addEventListener('click', () => {
+              const genotypeNames = [...new Set(dom.trialGenotypesInput.value.split(',').map(g => g.trim()).filter(Boolean))];
+              const trialData = {
+                trialId: dom.trialIdInput.value.trim(),
+                year: dom.trialYearInput.value.trim(),
+                season: dom.trialSeasonInput.value.trim().toUpperCase(),
+                name: dom.trialNameInput.value.trim(),
+                genotypes: genotypeNames.map(name => ({ name, isMerged: false })),
+                characters: parseCharactersInput(dom.trialCharactersInput.value),
+                tags: dom.trialTagsInput.value.split(',').map(t => t.trim()).filter(Boolean),
+                plantingDate: dom.trialPlantingDateInput.value || null,
+              };
+
+              if (!trialData.trialId || !trialData.year || !trialData.season || !trialData.name || !trialData.genotypes.length === 0 || !trialData.characters || trialData.characters.length === 0) {
+                showModalAlert('Error', 'Please fill in all required (*) fields.', () => dom.alertModal.classList.add('hidden'));
+                return;
+              }
+
+              if (editingTrialInternalId) {
+                const index = trials.findIndex(t => t.internalId === editingTrialInternalId);
+                if (index !== -1) {
+                  trials[index] = { ...trials[index], ...trialData };
+                }
+              } else {
+                trials.push({ ...trialData, internalId: crypto.randomUUID() });
+              }
+
+              saveTrials();
+              renderTrialButtons();
+              dom.trialModal.classList.add('hidden');
+            });
+
+            dom.importTrialBtn.addEventListener('click', () => {
+              const exampleCSV = `
+                        <p style="margin-bottom: 0.5rem;">Header must be: <code>TRIAL_ID,YEAR,SEASON,TRIAL_NAME,CHARACTERS,GENOTYPES</code></p>
+                        <p style="margin-bottom: 1rem;">The CHARACTERS value must be in double quotes.</p>
+                        <pre style="background-color: var(--base-200); padding: 0.5rem; border-radius: 0.25rem; font-size: 0.8rem;"><code>TRIAL_ID,YEAR,SEASON,TRIAL_NAME,CHARACTERS,GENOTYPES
+        EXP-01,2025,SUMMER,Rust Screening,"RUST_SCORE:num,NOTES:text",G-01,G-02,G-03</code></pre>
+                    `;
+              showModalAlert("Import Trials from CSV", exampleCSV, () => {
+                dom.fileImporter.click();
+                dom.alertModal.classList.add('hidden');
+              }, "Choose File");
+            });
+
+            dom.fileImporter.addEventListener('change', async (e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+
+              const reader = new FileReader();
+              reader.onload = async (event) => {
+                try {
+                  const csv = event.target.result;
+                  const lines = csv.split(/[\r\n]+/).filter(line => line.trim() !== '');
+                  if (lines.length < 2) throw new Error("CSV must have a header and at least one data row.");
+
+                  const header = parseCsvLine(lines[0].toUpperCase().trim());
+                  const requiredHeaders = ['TRIAL_ID', 'YEAR', 'SEASON', 'TRIAL_NAME', 'CHARACTERS', 'GENOTYPES'];
+                  const headerMap = requiredHeaders.reduce((acc, h, i) => ({ ...acc, [h]: header.indexOf(h) }), {});
+
+                  for (const req of requiredHeaders) {
+                    if (headerMap[req] === -1) {
+                      throw new Error(`Invalid header. Missing column: ${req}. Header must contain: ${requiredHeaders.join(',')}`);
                     }
-                    showModalAlert("Camera Access Error", errorMessage, () => dom.alertModal.classList.add('hidden'));
-                  }
-                }
-
-                function closeCamera() {
-                  if (cameraStream) {
-                    cameraStream.getTracks().forEach(track => track.stop());
-                  }
-                  dom.cameraModal.classList.add('hidden');
-                }
-
-                function capturePhoto() {
-                  if (!dom.cameraVideo.videoWidth || !dom.cameraVideo.videoHeight) {
-                    showModalAlert("Camera Error", "The camera is not ready yet. Please wait a moment and try again.", () => dom.alertModal.classList.add('hidden'));
-                    console.error("capturePhoto called before video stream dimensions were available.");
-                    return;
-                  }
-                  const canvas = document.createElement('canvas');
-                  canvas.width = dom.cameraVideo.videoWidth;
-                  canvas.height = dom.cameraVideo.videoHeight;
-                  const context = canvas.getContext('2d');
-                  context.drawImage(dom.cameraVideo, 0, 0, canvas.width, canvas.height);
-
-                  const genotypeName = currentTrial.genotypes[state.currentIndex].name;
-                  const genotypeData = state.data[genotypeName];
-
-                  genotypeData.photoCount = (genotypeData.photoCount || 0) + 1;
-                  const photoNumber = genotypeData.photoCount;
-                  saveState();
-
-                  renderCurrentForm();
-
-                  // Construct the new filename and the folder name from trial details
-                  const trialFolderName = getTrialFullName(currentTrial);
-                  const fileName = `${currentTrial.trialId}-${currentTrial.season}_${currentTrial.year}-${currentTrial.name}-${genotypeName} (${photoNumber}).jpg`;
-
-                  canvas.toBlob(blob => {
-                    exportFile(blob, fileName, 'image/jpeg', trialFolderName);
-                  }, 'image/jpeg', 1.0);
-
-                  closeCamera();
-                }
-
-                dom.addTrialBtn.addEventListener('click', () => {
-                  editingTrialInternalId = null;
-                  dom.trialModalTitle.textContent = 'Add New Trial';
-                  dom.trialIdInput.value = '';
-                  dom.trialYearInput.value = '';
-                  dom.trialSeasonInput.value = '';
-                  dom.trialNameInput.value = '';
-                  dom.trialGenotypesInput.value = '';
-                  dom.trialCharactersInput.value = '';
-                  dom.trialIdInput.disabled = false;
-                  dom.trialTagsInput.value = "";
-                  dom.trialPlantingDateInput.value = "";
-                  dom.trialIdWarning.textContent = '(Cannot be changed later)';
-                  dom.trialIdWarning.classList.remove('hidden');
-                  dom.trialModal.classList.remove('hidden');
-                });
-
-                dom.trialModalCancelBtn.addEventListener('click', () => {
-                  dom.trialModal.classList.add('hidden');
-                });
-
-                dom.trialModalSaveBtn.addEventListener('click', () => {
-                  const genotypeNames = [...new Set(dom.trialGenotypesInput.value.split(',').map(g => g.trim()).filter(Boolean))];
-                  const trialData = {
-                    trialId: dom.trialIdInput.value.trim(),
-                    year: dom.trialYearInput.value.trim(),
-                    season: dom.trialSeasonInput.value.trim().toUpperCase(),
-                    name: dom.trialNameInput.value.trim(),
-                    genotypes: genotypeNames.map(name => ({ name, isMerged: false })),
-                    characters: parseCharactersInput(dom.trialCharactersInput.value),
-                    tags: dom.trialTagsInput.value.split(',').map(t => t.trim()).filter(Boolean),
-                    plantingDate: dom.trialPlantingDateInput.value || null,
-                  };
-
-                  if (!trialData.trialId || !trialData.year || !trialData.season || !trialData.name || !trialData.genotypes.length === 0 || !trialData.characters || trialData.characters.length === 0) {
-                    showModalAlert('Error', 'Please fill in all required (*) fields.', () => dom.alertModal.classList.add('hidden'));
-                    return;
                   }
 
-                  if (editingTrialInternalId) {
-                    const index = trials.findIndex(t => t.internalId === editingTrialInternalId);
-                    if (index !== -1) {
-                      trials[index] = { ...trials[index], ...trialData };
+                  let importedCount = 0;
+                  let mergedCount = 0;
+                  let skippedCount = 0;
+
+                  for (let i = 1; i < lines.length; i++) {
+                    const values = parseCsvLine(lines[i]);
+                    if (values.length === 0 || !values[headerMap.TRIAL_ID]) continue;
+
+                    const genotypeNames = [...new Set((values[headerMap.GENOTYPES] || "").split(',').map(g => g.trim()).filter(Boolean))];
+                    const newTrialData = {
+                      trialId: values[headerMap.TRIAL_ID], year: values[headerMap.YEAR], season: values[headerMap.SEASON], name: values[headerMap.TRIAL_NAME],
+                      characters: parseCharactersInput(values[headerMap.CHARACTERS] || ""),
+                      genotypes: genotypeNames.map(name => ({ name, isMerged: false })),
+                    };
+
+                    if (!newTrialData.name || !newTrialData.characters) {
+                      skippedCount++;
+                      continue;
                     }
-                  } else {
-                    trials.push({ ...trialData, internalId: crypto.randomUUID() });
+
+                    const existingTrial = trials.find(t => t.name === newTrialData.name);
+
+                    if (existingTrial) {
+                      const decision = await showMergePrompt(newTrialData, existingTrial);
+                      if (decision === 'merge') {
+                        const existingCharNames = new Set(existingTrial.characters.map(c => c.name));
+                        newTrialData.characters.forEach(newChar => {
+                          if (!existingCharNames.has(newChar.name)) {
+                            existingTrial.characters.push({ ...newChar, isMerged: true });
+                          }
+                        });
+                        const existingGenoNames = new Set(existingTrial.genotypes.map(g => g.name));
+                        newTrialData.genotypes.forEach(newGeno => {
+                          if (!existingGenoNames.has(newGeno.name)) {
+                            existingTrial.genotypes.push({ ...newGeno, isMerged: true });
+                          }
+                        });
+                        mergedCount++;
+                      } else if (decision === 'new') {
+                        trials.push({ ...newTrialData, internalId: crypto.randomUUID() });
+                        importedCount++;
+                      } else {
+                        skippedCount++;
+                      }
+                    } else {
+                      trials.push({ ...newTrialData, internalId: crypto.randomUUID() });
+                      importedCount++;
+                    }
                   }
 
                   saveTrials();
                   renderTrialButtons();
-                  dom.trialModal.classList.add('hidden');
-                });
+                  let summaryMessage = `${importedCount} trial(s) imported. ${mergedCount} merged. ${skippedCount} skipped.`;
+                  showModalAlert('Import Complete', summaryMessage, () => dom.alertModal.classList.add('hidden'));
 
-                dom.importTrialBtn.addEventListener('click', () => {
-                  const exampleCSV = `
-                            <p style="margin-bottom: 0.5rem;">Header must be: <code>TRIAL_ID,YEAR,SEASON,TRIAL_NAME,CHARACTERS,GENOTYPES</code></p>
-                            <p style="margin-bottom: 1rem;">The CHARACTERS value must be in double quotes.</p>
-                            <pre style="background-color: var(--base-200); padding: 0.5rem; border-radius: 0.25rem; font-size: 0.8rem;"><code>TRIAL_ID,YEAR,SEASON,TRIAL_NAME,CHARACTERS,GENOTYPES
-            EXP-01,2025,SUMMER,Rust Screening,"RUST_SCORE:num,NOTES:text",G-01,G-02,G-03</code></pre>
-                        `;
-                  showModalAlert("Import Trials from CSV", exampleCSV, () => {
-                    dom.fileImporter.click();
-                    dom.alertModal.classList.add('hidden');
-                  }, "Choose File");
-                });
-
-                dom.fileImporter.addEventListener('change', async (e) => {
-                  const file = e.target.files[0];
-                  if (!file) return;
-
-                  const reader = new FileReader();
-                  reader.onload = async (event) => {
-                    try {
-                      const csv = event.target.result;
-                      const lines = csv.split(/[\r\n]+/).filter(line => line.trim() !== '');
-                      if (lines.length < 2) throw new Error("CSV must have a header and at least one data row.");
-
-                      const header = parseCsvLine(lines[0].toUpperCase().trim());
-                      const requiredHeaders = ['TRIAL_ID', 'YEAR', 'SEASON', 'TRIAL_NAME', 'CHARACTERS', 'GENOTYPES'];
-                      const headerMap = requiredHeaders.reduce((acc, h, i) => ({ ...acc, [h]: header.indexOf(h) }), {});
-
-                      for (const req of requiredHeaders) {
-                        if (headerMap[req] === -1) {
-                          throw new Error(`Invalid header. Missing column: ${req}. Header must contain: ${requiredHeaders.join(',')}`);
-                        }
-                      }
-
-                      let importedCount = 0;
-                      let mergedCount = 0;
-                      let skippedCount = 0;
-
-                      for (let i = 1; i < lines.length; i++) {
-                        const values = parseCsvLine(lines[i]);
-                        if (values.length === 0 || !values[headerMap.TRIAL_ID]) continue;
-
-                        const genotypeNames = [...new Set((values[headerMap.GENOTYPES] || "").split(',').map(g => g.trim()).filter(Boolean))];
-                        const newTrialData = {
-                          trialId: values[headerMap.TRIAL_ID], year: values[headerMap.YEAR], season: values[headerMap.SEASON], name: values[headerMap.TRIAL_NAME],
-                          characters: parseCharactersInput(values[headerMap.CHARACTERS] || ""),
-                          genotypes: genotypeNames.map(name => ({ name, isMerged: false })),
-                        };
-
-                        if (!newTrialData.name || !newTrialData.characters) {
-                          skippedCount++;
-                          continue;
-                        }
-
-                        const existingTrial = trials.find(t => t.name === newTrialData.name);
-
-                        if (existingTrial) {
-                          const decision = await showMergePrompt(newTrialData, existingTrial);
-                          if (decision === 'merge') {
-                            const existingCharNames = new Set(existingTrial.characters.map(c => c.name));
-                            newTrialData.characters.forEach(newChar => {
-                              if (!existingCharNames.has(newChar.name)) {
-                                existingTrial.characters.push({ ...newChar, isMerged: true });
-                              }
-                            });
-                            const existingGenoNames = new Set(existingTrial.genotypes.map(g => g.name));
-                            newTrialData.genotypes.forEach(newGeno => {
-                              if (!existingGenoNames.has(newGeno.name)) {
-                                existingTrial.genotypes.push({ ...newGeno, isMerged: true });
-                              }
-                            });
-                            mergedCount++;
-                          } else if (decision === 'new') {
-                            trials.push({ ...newTrialData, internalId: crypto.randomUUID() });
-                            importedCount++;
-                          } else {
-                            skippedCount++;
-                          }
-                        } else {
-                          trials.push({ ...newTrialData, internalId: crypto.randomUUID() });
-                          importedCount++;
-                        }
-                      }
-
-                      saveTrials();
-                      renderTrialButtons();
-                      let summaryMessage = `${importedCount} trial(s) imported. ${mergedCount} merged. ${skippedCount} skipped.`;
-                      showModalAlert('Import Complete', summaryMessage, () => dom.alertModal.classList.add('hidden'));
-
-                    } catch (error) {
-                      showModalAlert('Import Error', `Could not process file.<br><br><small>Details: ${error.message}</small>`, () => dom.alertModal.classList.add('hidden'));
-                    }
-                  };
-                  reader.readAsText(file);
-                  e.target.value = null;
-                });
-
-                dom.toggleRemarksBtn.addEventListener("click", () => {
-                  const isHidden = dom.remarksWrapper.classList.toggle("hidden");
-                  dom.toggleRemarksBtn.textContent = isHidden ? "Show" : "Hide";
-                  if (!isHidden) {
-                    dom.remarksInput.focus();
-                  }
-                });
-
-                dom.settingsBtn.addEventListener('click', () => dom.settingsModal.classList.remove('hidden'));
-                dom.settingsModalCloseBtn.addEventListener('click', () => dom.settingsModal.classList.add('hidden'));
-                dom.charLimitInput.addEventListener('change', (e) => { const newLimit = parseInt(e.target.value, 10); if (newLimit > 0 && newLimit <= 20) { characterLimit = newLimit; dom.charLimitDisplay.textContent = characterLimit; saveSettings(); } else { e.target.value = characterLimit; } });
-                dom.vibrateNextInput.addEventListener('change', () => {
-                  vibrateNext = parseInt(dom.vibrateNextInput.value) ?? VIBRATE_DEFAULT;
-                  saveSettings();
-                });
-                dom.vibratePrevInput.addEventListener('change', () => {
-                  vibratePrev = parseInt(dom.vibratePrevInput.value) ?? VIBRATE_DEFAULT;
-                  saveSettings();
-                });
-                dom.vibrateNextResetBtn.addEventListener('click', () => {
-                  vibrateNext = VIBRATE_DEFAULT;
-                  dom.vibrateNextInput.value = VIBRATE_DEFAULT;
-                  saveSettings();
-                });
-                dom.vibratePrevResetBtn.addEventListener('click', () => {
-                  vibratePrev = VIBRATE_DEFAULT;
-                  dom.vibratePrevInput.value = VIBRATE_DEFAULT;
-                  saveSettings();
-                });
-                dom.fixedPrevBtn.addEventListener("click", prev);
-                dom.fixedNextBtn.addEventListener("click", next);
-                dom.viewToggleBtn.addEventListener("click", () => {
-                  isCardView = !isCardView;
-                  applyReviewView();
-                });
-                dom.genotypeFilterInput.addEventListener("input", filterGenotypes);
-
-                dom.startRecordingBtn.addEventListener('click', async () => {
-                  if (selectedCharacters.length === 0) return;
-
-                  if (isChangingTraits) {
-                    isChangingTraits = false;
-                    showConfirmationPrompt(
-                      "Resume Position?",
-                      "Continue from the current genotype or start over from the beginning?",
-                      () => { // onConfirm: Continue
-                        updateView("entry");
-                        renderCurrentForm();
-                      },
-                      () => { // onCancel: Start Over
-                        state.currentIndex = 0;
-                        updateView("entry");
-                        renderCurrentForm();
-                      },
-                      "Continue",
-                      "Start Over"
-                    );
-                    return;
-                  }
-
-                  const savedState = await dbGet('trialStates', currentTrial.internalId);
-                  if (savedState) {
-                    const savedChars = savedState.selectedCharacters || [];
-                    const currentChars = selectedCharacters.map(c => c.name);
-                    savedChars.sort();
-                    currentChars.sort();
-
-                    if (JSON.stringify(savedChars) === JSON.stringify(currentChars) && savedState.currentIndex > 0) {
-                      showConfirmationPrompt(
-                        "Resume Session?",
-                        "You've selected the same traits as last time. Would you like to resume where you left off?",
-                        () => {
-                          state = savedState;
-                          updateView("entry");
-                          renderCurrentForm();
-                        },
-                        () => {
-                          startDataEntry();
-                        },
-                        "Yes, Resume",
-                        "No, Start Over"
-                      );
-                      return;
-                    }
-                  }
-                  startDataEntry();
-                });
-
-                dom.backToTrialsFromCharSelectBtn.addEventListener('click', () => {
-                  if (isChangingTraits) {
-                    isChangingTraits = false;
-                    updateView('entry'); // Go back to the entry screen
-                  } else {
-                    updateView('trial'); // Go back to the trial list
-                  }
-                });
-                dom.changeTrialBtn.addEventListener("click", backToTrialSelection);
-                dom.changeTraitsBtn.addEventListener("click", () => {
-                  isChangingTraits = true;
-                  updateView('character');
-                  renderCharacterSelection();
-                });
-                dom.goToSummaryBtn.addEventListener("click", () => { collectFormData(); prepareExportScreen(); });
-                dom.backToTrialsBtn.addEventListener("click", () => { collectFormData(); backToTrialSelection(); });
-                dom.exportCsvBtn.addEventListener("click", exportCSV);
-                dom.exportJsonBtn.addEventListener("click", exportJSON);
-                dom.backToEditBtn.addEventListener("click", () => updateView("entry"));
-                dom.modalCloseBtn.addEventListener("click", () => dom.alertModal.classList.add("hidden"));
-                dom.exportAllExcelBtn.addEventListener("click", exportAllToExcel);
-                dom.clearAllDataBtn.addEventListener("click", handleClearAllData);
-                dom.exportDbBtn.addEventListener("click", exportDB);
-                dom.importDbBtn.addEventListener("click", () => dom.dbImporter.click());
-                dom.dbImporter.addEventListener("change", (e) => {
-                  const file = e.target.files[0];
-                  if (file) importDB(file);
-                  e.target.value = null; // reset so the same file can be re-imported if needed
-                });
-                dom.cameraCloseBtn.addEventListener("click", closeCamera);
-                dom.capturePhotoBtn.addEventListener("click", capturePhoto);
-
-                const handleTableRowClick = (e) => {
-                  const row = e.target.closest("tr.clickable-row");
-                  if (!row) return;
-                  const index = parseInt(row.dataset.genotypeIndex, 10);
-                  if (!isNaN(index)) {
-                    state.currentIndex = index;
-                    saveState();
-                    updateView("entry");
-                    renderCurrentForm();
-                  }
-                };
-                dom.reviewTableContainer.addEventListener("click", handleTableRowClick);
-                dom.resultsTableContainer.addEventListener("click", handleTableRowClick);
-
-                dom.entryStep.addEventListener('input', (e) => {
-                  if (!currentTrial || !state.data) return;
-                  const genotypeName = currentTrial.genotypes[state.currentIndex]?.name;
-                  if (!genotypeName) return;
-                  const genotypeData = state.data[genotypeName];
-                  if (e.target.matches('#entry-form .input') || e.target.matches('#entry-form .select')) {
-                    genotypeData[e.target.dataset.charName] = e.target.value;
-                    // Range validation for num inputs
-                    if (e.target.type === 'number') {
-                      const charDef = currentTrial.characters.find(c => c.name === e.target.dataset.charName);
-                      if (charDef && charDef.min !== null && charDef.min !== undefined && charDef.max !== null && charDef.max !== undefined) {
-                        const val = parseFloat(e.target.value);
-                        const outOfRange = !isNaN(val) && (val < charDef.min || val > charDef.max);
-                        e.target.classList.toggle('out-of-range', outOfRange);
-                        const hint = dom.entryForm.querySelector(`[data-range-for="${charDef.name}"]`);
-                        if (hint) hint.classList.toggle('visible', outOfRange);
-                      }
-                    }
-                  }
-                });
-
-                dom.entryStep.addEventListener("keydown", (e) => {
-                  if (!currentTrial) return;
-
-                  if (e.ctrlKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
-                    e.preventDefault();
-                    if (e.key === 'ArrowRight') {
-                      next();
-                    } else if (e.key === 'ArrowLeft') {
-                      prev();
-                    }
-                    return;
-                  }
-
-                  const key = e.key;
-                  const target = e.target;
-
-                  if ((key === 'Enter' || key === 'Tab') && target.matches('#entry-form .input')) {
-                    e.preventDefault();
-
-                    const inputs = Array.from(dom.entryForm.querySelectorAll('.input'));
-                    const currentIndex = inputs.indexOf(target);
-                    const isLastInput = currentIndex === inputs.length - 1;
-
-                    if (!isLastInput) {
-                      inputs[currentIndex + 1].focus();
-                      inputs[currentIndex + 1].select();
-                    } else {
-                      target.blur();
-                      next();
-                    }
-                    return;
-                  }
-
-                  if (key === 'Tab' && !e.shiftKey && target.matches('#remarks-input')) {
-                    if (state.currentIndex < currentTrial.genotypes.length - 1) {
-                      e.preventDefault();
-                      next();
-                    }
-                  }
-                });
-
-                dom.entryStep.addEventListener("click", (e) => {
-                  const button = e.target.closest("[data-action]");
-                  if (button) {
-                    if (!currentTrial) return;
-                    const action = button.dataset.action;
-                    if (action === 'camera') {
-                      openCamera();
-                      return;
-                    }
-
-                    const genotypeName = currentTrial.genotypes[state.currentIndex].name;
-                    const genotypeData = state.data[genotypeName];
-                    if (action === "favorite") genotypeData.isFavorite = !genotypeData.isFavorite;
-                    if (action === "review") genotypeData.needsReview = !genotypeData.needsReview;
-                    if (action === "missing") genotypeData.isMissing = !genotypeData.isMissing;
-                    if (action === "tag") {
-                      const tag = button.dataset.tag;
-                      if (!genotypeData.tags) genotypeData.tags = [];
-                      const idx = genotypeData.tags.indexOf(tag);
-                      if (idx === -1) genotypeData.tags.push(tag); else genotypeData.tags.splice(idx, 1);
-                    }
-                    renderCurrentForm();
-                    saveState();
-
-                  }
-                });
-
-                dom.characterSelectionContainer.addEventListener('change', (e) => {
-                  if (e.target.type === 'checkbox') {
-                    const charName = e.target.dataset.charName;
-                    const isChecked = e.target.checked;
-                    const character = currentTrial.characters.find(c => c.name === charName);
-
-                    if (isChecked) {
-                      // Add the character if it's not already in the list
-                      if (!selectedCharacters.some(sc => sc.name === charName)) {
-                        if (selectedCharacters.length < characterLimit) {
-                          selectedCharacters.push(character);
-                        } else {
-                          e.target.checked = false; // Revert the checkbox
-                          showModalAlert('Limit Reached', `You can select a maximum of ${characterLimit} characters.`, () => dom.alertModal.classList.add('hidden'));
-                        }
-                      }
-                    } else {
-                      // Remove the character from the list
-                      selectedCharacters = selectedCharacters.filter(sc => sc.name !== charName);
-                    }
-
-                    dom.startRecordingBtn.disabled = selectedCharacters.length === 0;
-                  }
-                });
-
-                dom.trialButtonsContainer.addEventListener("click", (e) => {
-                  const button = e.target.closest("button[data-action]");
-                  if (!button) return;
-
-                  e.stopPropagation();
-                  const action = button.dataset.action;
-                  const internalId = button.dataset.id;
-                  const trialToActOn = trials.find(t => t.internalId === internalId);
-
-                  if (!trialToActOn) return;
-
-                  if (action === 'edit') {
-                    editingTrialInternalId = internalId;
-                    dom.trialModalTitle.textContent = 'Edit Trial';
-                    dom.trialIdInput.value = trialToActOn.trialId;
-                    dom.trialIdInput.disabled = true;
-                    dom.trialIdWarning.textContent = '(Cannot be edited)';
-                    dom.trialIdWarning.classList.remove('hidden');
-                    dom.trialYearInput.value = trialToActOn.year;
-                    dom.trialSeasonInput.value = trialToActOn.season;
-                    dom.trialNameInput.value = trialToActOn.name;
-                    dom.trialGenotypesInput.value = trialToActOn.genotypes.map(g => g.name).join(', ');
-                    dom.trialCharactersInput.value = trialToActOn.characters.map(c => {
-                      if (c.type === 'cat') return `${c.name}:cat:${(c.options || []).join(';')}`;
-                      if (c.type === 'num' && c.min !== null && c.min !== undefined) return `${c.name}:num:${c.min ?? ''}:${c.max ?? ''}`;
-                      return `${c.name}:${c.type}`;
-                    }).join(', ');
-                    dom.trialTagsInput.value = (trialToActOn.tags || []).join(', ');
-                    dom.trialPlantingDateInput.value = trialToActOn.plantingDate || '';
-                    dom.trialModal.classList.remove('hidden');
-                  } else if (action === 'delete') {
-                    showConfirmationPrompt(
-                      'Delete Trial?',
-                      `Are you sure you want to delete the trial "${getTrialFullName(trialToActOn)}"? This will also delete all its recorded data.`,
-                      () => {
-                        deleteTrial(internalId).then(() => {
-                          renderTrialButtons();
-                        });
-                      },
-                      null,
-                      "Yes, Delete",
-                      "Cancel"
-                    );
-                  }
-                });
-
-                async function initialize() {
-                  loadSettings();
-                  await migrateFromLocalStorage(); // one-time migration for existing users
-                  await loadTrials();
-                  updateView("trial");
+                } catch (error) {
+                  showModalAlert('Import Error', `Could not process file.<br><br><small>Details: ${error.message}</small>`, () => dom.alertModal.classList.add('hidden'));
                 }
-                initialize();
+              };
+              reader.readAsText(file);
+              e.target.value = null;
+            });
 
-              } catch (err) {
-                console.error(err);
-                const div = document.createElement("div");
-                div.style.cssText =
-                  "position:fixed;top:0;left:0;right:0;padding:0.75rem;background-color:var(--error-color);color:var(--error-content);z-index:1000;text-align:center;font-size:0.9rem;";
-                div.textContent = `A critical error occurred: ${err.message}`;
-                document.body.appendChild(div);
+            dom.toggleRemarksBtn.addEventListener("click", () => {
+              const isHidden = dom.remarksWrapper.classList.toggle("hidden");
+              dom.toggleRemarksBtn.textContent = isHidden ? "Show" : "Hide";
+              if (!isHidden) {
+                dom.remarksInput.focus();
               }
             });
-        </script>
-        MLTDR
-    </a>
-    <script>
-        document.getElementById("year").textContent = new Date().getFullYear();
-    </script>
-</footer>
-</body>
 
+            dom.settingsBtn.addEventListener('click', () => dom.settingsModal.classList.remove('hidden'));
+            dom.settingsModalCloseBtn.addEventListener('click', () => dom.settingsModal.classList.add('hidden'));
+            dom.charLimitInput.addEventListener('change', (e) => { const newLimit = parseInt(e.target.value, 10); if (newLimit > 0 && newLimit <= 20) { characterLimit = newLimit; dom.charLimitDisplay.textContent = characterLimit; saveSettings(); } else { e.target.value = characterLimit; } });
+            dom.vibrateNextInput.addEventListener('change', () => {
+              vibrateNext = parseInt(dom.vibrateNextInput.value) ?? VIBRATE_DEFAULT;
+              saveSettings();
+            });
+            dom.vibratePrevInput.addEventListener('change', () => {
+              vibratePrev = parseInt(dom.vibratePrevInput.value) ?? VIBRATE_DEFAULT;
+              saveSettings();
+            });
+            dom.vibrateNextResetBtn.addEventListener('click', () => {
+              vibrateNext = VIBRATE_DEFAULT;
+              dom.vibrateNextInput.value = VIBRATE_DEFAULT;
+              saveSettings();
+            });
+            dom.vibratePrevResetBtn.addEventListener('click', () => {
+              vibratePrev = VIBRATE_DEFAULT;
+              dom.vibratePrevInput.value = VIBRATE_DEFAULT;
+              saveSettings();
+            });
+            dom.fixedPrevBtn.addEventListener("click", prev);
+            dom.fixedNextBtn.addEventListener("click", next);
+            dom.viewToggleBtn.addEventListener("click", () => {
+              isCardView = !isCardView;
+              applyReviewView();
+            });
+            dom.genotypeFilterInput.addEventListener("input", filterGenotypes);
+
+            dom.startRecordingBtn.addEventListener('click', async () => {
+              if (selectedCharacters.length === 0) return;
+
+              if (isChangingTraits) {
+                isChangingTraits = false;
+                showConfirmationPrompt(
+                  "Resume Position?",
+                  "Continue from the current genotype or start over from the beginning?",
+                  () => { // onConfirm: Continue
+                    updateView("entry");
+                    renderCurrentForm();
+                  },
+                  () => { // onCancel: Start Over
+                    state.currentIndex = 0;
+                    updateView("entry");
+                    renderCurrentForm();
+                  },
+                  "Continue",
+                  "Start Over"
+                );
+                return;
+              }
+
+              const savedState = await dbGet('trialStates', currentTrial.internalId);
+              if (savedState) {
+                const savedChars = savedState.selectedCharacters || [];
+                const currentChars = selectedCharacters.map(c => c.name);
+                savedChars.sort();
+                currentChars.sort();
+
+                if (JSON.stringify(savedChars) === JSON.stringify(currentChars) && savedState.currentIndex > 0) {
+                  showConfirmationPrompt(
+                    "Resume Session?",
+                    "You've selected the same traits as last time. Would you like to resume where you left off?",
+                    () => {
+                      state = savedState;
+                      updateView("entry");
+                      renderCurrentForm();
+                    },
+                    () => {
+                      startDataEntry();
+                    },
+                    "Yes, Resume",
+                    "No, Start Over"
+                  );
+                  return;
+                }
+              }
+              startDataEntry();
+            });
+
+            dom.backToTrialsFromCharSelectBtn.addEventListener('click', () => {
+              if (isChangingTraits) {
+                isChangingTraits = false;
+                updateView('entry'); // Go back to the entry screen
+              } else {
+                updateView('trial'); // Go back to the trial list
+              }
+            });
+            dom.changeTrialBtn.addEventListener("click", backToTrialSelection);
+            dom.changeTraitsBtn.addEventListener("click", () => {
+              isChangingTraits = true;
+              updateView('character');
+              renderCharacterSelection();
+            });
+            dom.goToSummaryBtn.addEventListener("click", () => { collectFormData(); prepareExportScreen(); });
+            dom.backToTrialsBtn.addEventListener("click", () => { collectFormData(); backToTrialSelection(); });
+            dom.exportCsvBtn.addEventListener("click", exportCSV);
+            dom.exportTidyCsvBtn.addEventListener("click", exportTidyCSV);
+            dom.exportJsonBtn.addEventListener("click", exportJSON);
+            dom.missingValueInput.addEventListener('input', () => {
+              missingValueIndicator = dom.missingValueInput.value;
+              saveSettings();
+            });
+            document.querySelectorAll('.mv-preset').forEach(btn => {
+              btn.addEventListener('click', () => {
+                missingValueIndicator = btn.dataset.mv;
+                dom.missingValueInput.value = missingValueIndicator;
+                saveSettings();
+              });
+            });
+            dom.backToEditBtn.addEventListener("click", () => updateView("entry"));
+            dom.modalCloseBtn.addEventListener("click", () => dom.alertModal.classList.add("hidden"));
+            dom.exportAllExcelBtn.addEventListener("click", exportAllToExcel);
+            dom.clearAllDataBtn.addEventListener("click", handleClearAllData);
+            dom.exportDbBtn.addEventListener("click", exportDB);
+            dom.importDbBtn.addEventListener("click", () => dom.dbImporter.click());
+            dom.dbImporter.addEventListener("change", (e) => {
+              const file = e.target.files[0];
+              if (file) importDB(file);
+              e.target.value = null; // reset so the same file can be re-imported if needed
+            });
+            dom.cameraCloseBtn.addEventListener("click", closeCamera);
+            dom.capturePhotoBtn.addEventListener("click", capturePhoto);
+
+            const handleTableRowClick = (e) => {
+              const row = e.target.closest("tr.clickable-row");
+              if (!row) return;
+              const index = parseInt(row.dataset.genotypeIndex, 10);
+              if (!isNaN(index)) {
+                state.currentIndex = index;
+                saveState();
+                updateView("entry");
+                renderCurrentForm();
+              }
+            };
+            dom.reviewTableContainer.addEventListener("click", handleTableRowClick);
+            dom.resultsTableContainer.addEventListener("click", handleTableRowClick);
+
+            // Debounced autosave — fires 1.5s after the user stops typing.
+            // Guards against data loss if the tab is closed or the phone dies mid-entry.
+            let _autoSaveTimer = null;
+            function scheduleAutoSave() {
+              clearTimeout(_autoSaveTimer);
+              _autoSaveTimer = setTimeout(() => { saveState(); }, 1500);
+            }
+
+            dom.entryStep.addEventListener('input', (e) => {
+              if (!currentTrial || !state.data) return;
+              const genotypeName = currentTrial.genotypes[state.currentIndex]?.name;
+              if (!genotypeName) return;
+              const genotypeData = state.data[genotypeName];
+              if (e.target.matches('#entry-form .input') || e.target.matches('#entry-form .select')) {
+                genotypeData[e.target.dataset.charName] = e.target.value;
+                // Range validation for num inputs
+                if (e.target.type === 'number') {
+                  const charDef = currentTrial.characters.find(c => c.name === e.target.dataset.charName);
+                  if (charDef && charDef.min !== null && charDef.min !== undefined && charDef.max !== null && charDef.max !== undefined) {
+                    const val = parseFloat(e.target.value);
+                    const outOfRange = !isNaN(val) && (val < charDef.min || val > charDef.max);
+                    e.target.classList.toggle('out-of-range', outOfRange);
+                    const hint = dom.entryForm.querySelector(`[data-range-for="${charDef.name}"]`);
+                    if (hint) hint.classList.toggle('visible', outOfRange);
+                  }
+                }
+                scheduleAutoSave(); // silent background save after typing stops
+              }
+            });
+
+            let _lastNavTime = 0;
+            dom.entryStep.addEventListener("keydown", (e) => {
+              if (!currentTrial) return;
+
+              if (e.ctrlKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+                e.preventDefault();
+                const now = Date.now();
+                if (now - _lastNavTime < 200) return; // throttle: max one skip per 200ms
+                _lastNavTime = now;
+                if (e.key === 'ArrowRight') {
+                  next();
+                } else if (e.key === 'ArrowLeft') {
+                  prev();
+                }
+                return;
+              }
+
+              const key = e.key;
+              const target = e.target;
+
+              if ((key === 'Enter' || key === 'Tab') && target.matches('#entry-form .input')) {
+                e.preventDefault();
+
+                const inputs = Array.from(dom.entryForm.querySelectorAll('.input'));
+                const currentIndex = inputs.indexOf(target);
+                const isLastInput = currentIndex === inputs.length - 1;
+
+                if (!isLastInput) {
+                  inputs[currentIndex + 1].focus();
+                  inputs[currentIndex + 1].select();
+                } else {
+                  target.blur();
+                  next();
+                }
+                return;
+              }
+
+              if (key === 'Tab' && !e.shiftKey && target.matches('#remarks-input')) {
+                if (state.currentIndex < currentTrial.genotypes.length - 1) {
+                  e.preventDefault();
+                  next();
+                }
+              }
+            });
+
+            dom.entryStep.addEventListener("click", (e) => {
+              const button = e.target.closest("[data-action]");
+              if (button) {
+                if (!currentTrial) return;
+                const action = button.dataset.action;
+                if (action === 'camera') {
+                  openCamera();
+                  return;
+                }
+
+                const genotypeName = currentTrial.genotypes[state.currentIndex].name;
+                const genotypeData = state.data[genotypeName];
+                if (action === "favorite") genotypeData.isFavorite = !genotypeData.isFavorite;
+                if (action === "review") genotypeData.needsReview = !genotypeData.needsReview;
+                if (action === "missing") genotypeData.isMissing = !genotypeData.isMissing;
+                if (action === "tag") {
+                  const tag = button.dataset.tag;
+                  if (!genotypeData.tags) genotypeData.tags = [];
+                  const idx = genotypeData.tags.indexOf(tag);
+                  if (idx === -1) genotypeData.tags.push(tag); else genotypeData.tags.splice(idx, 1);
+                }
+                renderCurrentForm();
+                saveState();
+
+              }
+            });
+
+            dom.characterSelectionContainer.addEventListener('change', (e) => {
+              if (e.target.type === 'checkbox') {
+                const charName = e.target.dataset.charName;
+                const isChecked = e.target.checked;
+                const character = currentTrial.characters.find(c => c.name === charName);
+
+                if (isChecked) {
+                  // Add the character if it's not already in the list
+                  if (!selectedCharacters.some(sc => sc === character)) {
+                    if (selectedCharacters.length < characterLimit) {
+                      selectedCharacters.push(character);
+                    } else {
+                      e.target.checked = false; // Revert the checkbox
+                      showModalAlert('Limit Reached', `You can select a maximum of ${characterLimit} characters.`, () => dom.alertModal.classList.add('hidden'));
+                    }
+                  }
+                } else {
+                  // Remove by object reference so duplicate-named traits don't both get removed
+                  selectedCharacters = selectedCharacters.filter(sc => sc !== character);
+                }
+
+                dom.startRecordingBtn.disabled = selectedCharacters.length === 0;
+              }
+            });
+
+            dom.trialButtonsContainer.addEventListener("click", (e) => {
+              const button = e.target.closest("button[data-action]");
+              if (!button) return;
+
+              e.stopPropagation();
+              const action = button.dataset.action;
+              const internalId = button.dataset.id;
+              const trialToActOn = trials.find(t => t.internalId === internalId);
+
+              if (!trialToActOn) return;
+
+              if (action === 'edit') {
+                editingTrialInternalId = internalId;
+                dom.trialModalTitle.textContent = 'Edit Trial';
+                dom.trialIdInput.value = trialToActOn.trialId;
+                dom.trialIdInput.disabled = true;
+                dom.trialIdWarning.textContent = '(Cannot be edited)';
+                dom.trialIdWarning.classList.remove('hidden');
+                dom.trialYearInput.value = trialToActOn.year;
+                dom.trialSeasonInput.value = trialToActOn.season;
+                dom.trialNameInput.value = trialToActOn.name;
+                dom.trialGenotypesInput.value = trialToActOn.genotypes.map(g => g.name).join(', ');
+                dom.trialCharactersInput.value = trialToActOn.characters.map(c => {
+                  if (c.type === 'cat') return `${c.name}:cat:${(c.options || []).join(';')}`;
+                  if (c.type === 'num' && c.min !== null && c.min !== undefined) return `${c.name}:num:${c.min ?? ''}:${c.max ?? ''}`;
+                  return `${c.name}:${c.type}`;
+                }).join(', ');
+                dom.trialTagsInput.value = (trialToActOn.tags || []).join(', ');
+                dom.trialPlantingDateInput.value = trialToActOn.plantingDate || '';
+                dom.trialModal.classList.remove('hidden');
+              } else if (action === 'delete') {
+                showConfirmationPrompt(
+                  'Delete Trial?',
+                  `Are you sure you want to delete the trial "${getTrialFullName(trialToActOn)}"? This will also delete all its recorded data.`,
+                  () => {
+                    deleteTrial(internalId).then(() => {
+                      renderTrialButtons();
+                    });
+                  },
+                  null,
+                  "Yes, Delete",
+                  "Cancel"
+                );
+              }
+            });
+
+            async function initialize() {
+              loadSettings();
+              await migrateFromLocalStorage(); // one-time migration for existing users
+              await loadTrials();
+              updateView("trial");
+            }
+            initialize();
+
+          } catch (err) {
+            console.error(err);
+            const div = document.createElement("div");
+            div.style.cssText =
+              "position:fixed;top:0;left:0;right:0;padding:0.75rem;background-color:var(--error-color);color:var(--error-content);z-index:1000;text-align:center;font-size:0.9rem;";
+            div.textContent = `A critical error occurred: ${err.message}`;
+            document.body.appendChild(div);
+          }
+        });
+</script>
+</body>
 </html>

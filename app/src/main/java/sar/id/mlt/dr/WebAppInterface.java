@@ -1,11 +1,14 @@
 package sar.id.mlt.dr;
 
+import android.Manifest;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.provider.MediaStore;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
@@ -13,6 +16,7 @@ import android.util.Base64;
 import android.util.Log;
 
 import androidx.annotation.RequiresApi;
+import androidx.annotation.RequiresPermission;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -30,6 +34,28 @@ public class WebAppInterface {
 
     WebAppInterface(Context c) {
         mContext = c;
+    }
+
+    /**
+     * Native haptic feedback — called from JS as window.Android.vibrate(ms).
+     * More reliable than navigator.vibrate() which is inconsistent across
+     * Android WebView versions and can be silently blocked by the OS.
+     */
+    @RequiresPermission(Manifest.permission.VIBRATE)
+    @JavascriptInterface
+    public void vibrate(int durationMs) {
+        if (durationMs <= 0) return;
+        try {
+            Vibrator vibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
+            if (vibrator == null || !vibrator.hasVibrator()) return;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE));
+            } else {
+                vibrator.vibrate(durationMs);
+            }
+        } catch (Exception e) {
+            Log.w("WebAppInterface", "Vibrate failed: " + e.getMessage());
+        }
     }
 
     @JavascriptInterface

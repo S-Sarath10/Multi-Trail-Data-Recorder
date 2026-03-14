@@ -18,9 +18,15 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class WebAppInterface {
     private final Context mContext;
+
+    // Single-thread executor so file writes are off the JS thread but still
+    // serialised — no two writes race each other.
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     WebAppInterface(Context c) {
         mContext = c;
@@ -28,33 +34,48 @@ public class WebAppInterface {
 
     @JavascriptInterface
     public void saveFile(String base64Data, String fileName, String mimeType, String trialFolderName) {
-        try {
-            byte[] fileBytes = Base64.decode(base64Data, Base64.DEFAULT);
-            boolean isImage = mimeType != null && mimeType.startsWith("image/");
-
-            String primaryDir = isImage ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS;
-            String relativePath = primaryDir;
-
-            if (isImage && trialFolderName != null && !trialFolderName.trim().isEmpty()) {
-                relativePath = primaryDir + File.separator + trialFolderName.trim();
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                saveWithMediaStore(fileBytes, fileName, mimeType, relativePath, isImage);
-            } else {
-                saveLegacyWithMediaStore(fileBytes, fileName, mimeType, relativePath, isImage);
-            }
-        } catch (Exception e) {
-            Log.e("WebAppInterface", "Failed to save file", e);
-            showToast("Save failed: " + e.getMessage());
+        // Input validation — fail fast with a clear message rather than a cryptic exception
+        if (base64Data == null || base64Data.isEmpty()) {
+            showToast("Save failed: no data provided");
+            return;
         }
+        if (fileName == null || fileName.trim().isEmpty()) {
+            showToast("Save failed: file name is missing");
+            return;
+        }
+
+        // Run the actual file write on a background thread so the JS thread
+        // is freed immediately and the UI stays responsive.
+        executor.execute(() -> {
+            try {
+                byte[] fileBytes = Base64.decode(base64Data, Base64.DEFAULT);
+                boolean isImage = mimeType != null && mimeType.startsWith("image/");
+
+                String primaryDir = isImage ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS;
+                String relativePath = primaryDir;
+
+                if (isImage && trialFolderName != null && !trialFolderName.trim().isEmpty()) {
+                    relativePath = primaryDir + File.separator + trialFolderName.trim();
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    saveWithMediaStore(fileBytes, fileName, mimeType, relativePath, isImage);
+                } else {
+                    saveLegacy(fileBytes, fileName, relativePath, isImage);
+                }
+            } catch (Exception e) {
+                Log.e("WebAppInterface", "Failed to save file", e);
+                showToast("Save failed: " + e.getMessage());
+            }
+        });
     }
 
     /**
-     * Scoped storage save for Android 10+ using MediaStore.
+     * Scoped storage save for Android 10+ (API 29+) using MediaStore.
      */
     @RequiresApi(api = Build.VERSION_CODES.Q)
-    private void saveWithMediaStore(byte[] fileBytes, String fileName, String mimeType, String relativePath, boolean isImage) throws Exception {
+    private void saveWithMediaStore(byte[] fileBytes, String fileName, String mimeType,
+                                    String relativePath, boolean isImage) throws Exception {
         ContentResolver resolver = mContext.getContentResolver();
         ContentValues values = new ContentValues();
         values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
@@ -63,7 +84,7 @@ public class WebAppInterface {
 
         Uri collection = isImage
                 ? MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                : MediaStore.Downloads.EXTERNAL_CONTENT_URI; // Safe because this branch is only API 29+
+                : MediaStore.Downloads.EXTERNAL_CONTENT_URI;
 
         Uri fileUri = resolver.insert(collection, values);
         if (fileUri == null) throw new IOException("Failed to create MediaStore entry.");
@@ -77,33 +98,36 @@ public class WebAppInterface {
     }
 
     /**
-     * MediaStore save for Android 9 and below (minSdkVersion 24).
-     * Uses MediaStore.Files for compatibility.
+     * Direct FileOutputStream save for Android 9 and below (API < 29).
+     * Avoids the deprecated MediaStore.MediaColumns.DATA raw-path approach
+     * which is unreliable on some Android 9 devices.
      */
-    private void saveLegacyWithMediaStore(byte[] fileBytes, String fileName, String mimeType, String relativePath, boolean isImage) throws Exception {
-        ContentResolver resolver = mContext.getContentResolver();
-        ContentValues values = new ContentValues();
-        values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
-        values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+    private void saveLegacy(byte[] fileBytes, String fileName,
+                            String relativePath, boolean isImage) throws Exception {
+        File baseDir = isImage
+                ? Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                : Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
 
-        // Absolute path for legacy
-        String fullPath = Environment.getExternalStoragePublicDirectory(relativePath).getAbsolutePath() + File.separator + fileName;
-        values.put(MediaStore.MediaColumns.DATA, fullPath);
+        // Build the subfolder path (e.g. Pictures/TrialName) without passing
+        // a constructed string to getExternalStoragePublicDirectory.
+        File targetDir = (isImage && relativePath.contains(File.separator))
+                ? new File(baseDir, relativePath.substring(relativePath.indexOf(File.separator) + 1))
+                : baseDir;
 
-        Uri collection = MediaStore.Files.getContentUri("external");
-        Uri fileUri = resolver.insert(collection, values);
-        if (fileUri == null) throw new IOException("Failed to insert into MediaStore.");
-
-        try (OutputStream out = resolver.openOutputStream(fileUri)) {
-            if (out == null) throw new IOException("OutputStream is null");
-            out.write(fileBytes);
+        if (!targetDir.exists() && !targetDir.mkdirs()) {
+            throw new IOException("Could not create directory: " + targetDir.getAbsolutePath());
         }
 
-        showToast("File saved to " + fullPath);
+        File outFile = new File(targetDir, fileName);
+        try (FileOutputStream fos = new FileOutputStream(outFile)) {
+            fos.write(fileBytes);
+        }
+
+        showToast("File saved to " + outFile.getAbsolutePath());
     }
 
     /**
-     * UI Thread toast helper
+     * UI thread toast helper — safe to call from any thread.
      */
     private void showToast(final String message) {
         new android.os.Handler(mContext.getMainLooper()).post(
